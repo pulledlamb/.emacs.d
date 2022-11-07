@@ -147,11 +147,12 @@
 ;; export LC_ALL=en_US.UTF-8
 ;; export LC_CTYPE=en_US.UTF-8
 
-(defvar default-buffer-file-coding-system 'utf-8)
+;; (defvar default-buffer-file-coding-system 'utf-8)
 (prefer-coding-system 'utf-8)
 (set-default-coding-systems 'utf-8)
 (set-terminal-coding-system 'utf-8)
 (set-keyboard-coding-system 'utf-8)
+(setq default-buffer-file-coding-system 'utf-8)
 
 ;; Improved global minor mode for scrolling in Emacs 29
 (if (> emacs-major-version 28)
@@ -416,20 +417,28 @@
 
 ;;auto-completion system
 (use-package company
-  :config
-  (setq company-tooltip-limit 10)
-  (setq company-minimum-prefix-length 2)
-  (setq company-tooltip-align-annotations t)
+  :hook
+  (after-init . global-company-mode)
+  :init
+  (setq company-tooltip-limit 10
+	company-minimum-prefix-length 2
+	company-tooltip-align-annotations t
   ;; (setq company-backends '((company-capf company-dabbrev company-files)))
 
   ;; invert the navigation direction if the the completion popup-isearch-match
-  ;; is displayed on top (happens near the bottom of windows)
-  (setq company-tooltip-flip-when-above t)
-  (setq company-global-modes '(not inferior-python-mode))
-  (setq company-idle-delay 0.3)
-  (setq company-show-numbers t)
-  :hook
-  (after-init . global-company-mode)
+	;; is displayed on top (happens near the bottom of windows)
+	company-tooltip-flip-when-above t
+	company-global-modes '(not inferior-python-mode eshell-mode shell-mode)
+	company-idle-delay 0.3
+	company-show-numbers t
+	company-backends '((company-capf :with company-yasnippet)
+			   (company-dabbrev-code company-keywords company-files)
+			   (company-dabbrev company-ispell)))
+  (setq company-files-exclusions '(".git/" ".DS_Store"))
+  :bind
+  (:map company-active-map
+	("<tab>" . company-complete-selection))
+  )
 ;;   :bind
 ;;   (:map company-active-map
 ;; 	("C-n" . company-select-next)
@@ -438,33 +447,31 @@
 ;; 	;;               NEW
 ;; ;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ;; 	("<tab>" . company-complete-selection))
-  :custom
-  (company-minimum-prefix-length 1)
-  (company-idle-delay 0.0)
 ;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ;;               NEW
 ;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-  )
-(defun add-pcomplete-to-capf ()
-  (add-hook 'completion-at-point-functions 'pcomplete-completions-at-point nil t))
+;;   )
+;; (defun add-pcomplete-to-capf ()
+;;   (add-hook 'completion-at-point-functions 'pcomplete-completions-at-point nil t))
 
 
-(defun text-mode-hook-setup ()
-  ;; make `company-backends' local is critcal
-  ;; or else, you will have completion in every major mode, that's very annoying!
-  (make-local-variable 'company-backends)
+;; (defun text-mode-hook-setup ()
+;;   ;; make `company-backends' local is critcal
+;;   ;; or else, you will have completion in every major mode, that's very annoying!
+;;   (make-local-variable 'company-backends)
 
-  ;; company-ispell is the plugin to complete words
-  (add-to-list 'company-backends 'company-ispell)
-  (add-to-list 'company-backends 'company-capf)
-  (add-to-list 'company-backends 'company-files)
-  (add-to-list 'company-backends 'company-dabbrev)
+;;   ;; company-ispell is the plugin to complete words
+;;   (add-to-list 'company-backends 'company-ispell)
+;;   (add-to-list 'company-backends 'company-capf)
+;;   (add-to-list 'company-backends 'company-files)
+;;   (add-to-list 'company-backends 'company-dabbrev)
 
-  ;; OPTIONAL, if `company-ispell-dictionary' is nil, `ispell-complete-word-dict' is used
-  ;;  but I prefer hard code the dictionary path. That's more portable.
-  (setq company-ispell-dictionary (file-truename "~/.emacs.d/misc/english-words.txt")))
+;;   ;; OPTIONAL, if `company-ispell-dictionary' is nil, `ispell-complete-word-dict' is used
+;;   ;;  but I prefer hard code the dictionary path. That's more portable.
+;;   ;; (setq company-ispell-dictionary (file-truename "~/.emacs.d/misc/english-words.txt"))
+;;   )
 
-(add-hook 'text-mode-hook 'text-mode-hook-setup)
+;; (add-hook 'text-mode-hook 'text-mode-hook-setup)
 
 ;; (add-hook 'org-mode-hook #'add-pcomplete-to-capf)
 
@@ -481,36 +488,6 @@
 (use-package company-shell
   :config
   (add-to-list 'company-backends 'company-shell-env))
-
-;;A machine-learning based backend for company
-;;May conflict with company-flx-mode/ESS mode
-;; (use-package company-tabnine
-;;   :defer 1
-;;   :after company
-;;   :config
-;;   (eval-after-load 'company-tabnine
-;;     (if (not (file-directory-p "~/.TabNine/"))
-;; 	(company-tabnine-install-binary)))
-;;   (add-to-list 'company-backends #'company-tabnine)
-;;   )
-
-
-;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-;;               NEW
-;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-
-;; (use-package company-org-block
-;;   :defer t
-;;   :custom
-;;   (company-org-block-edit-style 'auto) ;; 'auto, 'prompt, or 'inline
-;;   :hook ((org-mode . (lambda ()
-;; 		       (setq-local company-backends '(company-org-block))
-;; 		       (company-mode 1)))))
-;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-;;               NEW
-;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
 
 ;;A fuzzy matching of company
 (use-package company-flx
@@ -536,10 +513,6 @@
     (let ((info '(:internal-border-width 0)))
       (or (plist-get info arg-name) value))))
 
-;; Alternative to company-posframe, there's also company-quickhelp
-;; (use-package company-box
-;;   :hook
-;;   (company-mode . company-box-mode))
 
 ;;To specify new version of git on remote machine so I can run magit locally
 ;;add ~/.ssh/config and ~/.ssh/known_hosts first
@@ -633,32 +606,17 @@
 					     python-pycompile
 					     emacs-lisp-checkdoc)))
 
-;; (use-package flycheck-grammarly
-;;   :config
-;;   (setq flycheck-grammarly-check-time 0.8))
 
 (use-package flycheck-inline
   :hook
   (flycheck-mode . flycheck-inline-mode))
 
-;; https://github.com/languagetool-org/languagetool
-;; alternative: https://github.com/emacs-languagetool/flycheck-languagetool
-(use-package languagetool
+(use-package flycheck-grammarly
   :config
-  (setq languagetool-language-tool-jar
-	(concat (getenv "HOME") "/Library" "/LanguageTool-5.5-stable/languagetool-commandline.jar"))
-  (setq languagetool-language-tool-server-jar
-	(concat (getenv "HOME") "/Library" "/LanguageTool-5.5-stable/languagetool-server.jar"))
-  (setq languagetool-server-user-arguments '("-p" "8082"))
-  (setq languagetool-default-language "en-US")
-  (setq languagetool-java-bin "/usr/bin/java")
-  (setq languagetool-java-arguments '("-Dfile.encoding=UTF-8"))
-  :bind
-  ("C-c C-; c" . languagetool-check)
-  ("C-c C-; d" . languagetool-clear-buffer)
-  ("C-c C-; i" . languagetool-correct-at-point)
-  ("C-c C-; b" . languagetool-buffer)
-  ("C-c C-; l" . languagetool-set-language))
+  (setq flycheck-grammarly-check-time 0.8)
+  ;; :hook
+  ;; (flycheck-mode . flycheck-grammarly-setup)
+  )
 
 ;; Doc: https://github.com/egh/zotxt-emacs
 ;; (use-package zotxt-emacs)
@@ -678,16 +636,28 @@
   (org-mode . flyspell-mode)
   (LaTeX-mode . flyspell-mode)
   :config
-  (setq-default ispell-program-name "aspell") ;;depends on aspell in the path
-;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-;;               NEW
-;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-  (setq-default ispell-local-dictionary "en_US")
-  (setq ispell-extra-args '("--sug-mode=fast" "--lang=en_US"
-			    "--camel-case" "--run-together")))
+  (setq ispell-program-name "aspell"
+	ispell-dictionary "en_US"
+	;; ispell-quietly t
+	;; ispell-silently-savep t
+	ispell-local-dictionary "en_US"
+	ispell-extra-args '("--sug-mode=fast" "--lang=en_US"
+			    "--camel-case" "--run-together"))
+  (setq flyspell-default-dictionary "en_US")
+  )
 
 ;; Quickly switch dictionaries
 ;; Adapted from DiogoRamos' snippet on https://www.emacswiki.org/emacs/FlySpell#h5o-5
+
+(add-to-list 'ispell-skip-region-alist '(":\\(PROPERTIES\\|LOGBOOK\\):" . ":END:"))
+(add-to-list 'ispell-skip-region-alist '("#\\+BEGIN_SRC" . "#\\+END_SRC"))
+;; (add-to-list 'ispell-skip-region-alist '(org-property-drawer-re))
+;; (add-to-list 'ispell-skip-region-alist '(":noexport:"))
+;; (add-to-list 'ispell-skip-region-alist '("#\\+LATEX:"))
+;; (add-to-list 'ispell-skip-region-alist '("#\\+LANGUAGE:" . "\n"))
+;; (add-to-list 'ispell-skip-region-alist '("#\\+LATEX_HEADER:" . "\n"))
+;; (add-to-list 'ispell-skip-region-alist '("#\\+OPTIONS:"))
+;; (add-to-list 'ispell-skip-region-alist '("#\\+SETUPFILE:"))
 
 (let ((langs '("francais" "english")))
   (defvar lang-ring (make-ring (length langs))
@@ -858,17 +828,6 @@
                         "[/\\]\\elpa/"
                         "bookmark"
                         ))
-;; (use-package recentf
-;;   :straight (:type built-in)
-;;   :config
-;;   (setq-default
-;;    recentf-max-saved-items 30
-;;    recentf-exclude `("/tmp/",
-;; 		     (concat "~/.emacs.d/straight/build" "/.*-autoloads\\.el\\'")))
-;;   (global-set-key (kbd "<f3>") #'recentf-open-files)
-;;   :hook
-;;   (after-init . recentf-mode))
-
 
 ;;sorting and filtering framework for ivy
 (use-package ivy-prescient
@@ -983,7 +942,7 @@
 ;; globally go to previous position; "C-u C-SPC" to do same locally
 (global-set-key (kbd "C-c C-SPC") 'pop-global-mark)
 (define-key key-translation-map (kbd "C-d") (kbd "<deletechar>"))
-(global-set-key (kbd "\C-d") 'delete-forward-char)
+(global-set-key (kbd "C-d") 'delete-forward-char)
 ;; evil insert mode
 (evil-define-key 'insert global-map (kbd "C-J") 'evil-next-line)
 (evil-define-key 'insert global-map (kbd "C-K") 'evil-previous-line)
@@ -1610,7 +1569,7 @@
   (dashboard-setup-startup-hook)
   (setq dashboard-banner-logo-title "I CAN DO ALL THINGS?!	 ಠ_ಠ")
   ;;    (setq dashboard-startup-banner 3)
-  (setq dashboard-startup-banner "~/.emacs.d/fancy-splash/world.png")
+  (setq dashboard-startup-banner "~/.emacs.d/fancy-splash/world_origin.png")
 
   (setq dashboard-center-content t)
   (setq dashboard-items '((recents . 5)
@@ -1630,8 +1589,9 @@
   (setq dashboard-set-navigator t)
   (setq initial-buffer-choice (lambda () (get-buffer "*dashboard*"))) ;; show Dashboard in frames created with emacsclient -c
   (setq dashboard-projects-switch-function 'counsel-projectile-switch-project-by-name)
-  (define-key dashboard-mode-map (kbd "n") 'next-line)
-  (define-key dashboard-mode-map (kbd "p") 'previous-line))
+  ;; (define-key dashboard-mode-map (kbd "m") 'next-line)
+  ;; (define-key dashboard-mode-map (kbd "p") 'previous-line)
+  )
 
 (use-package highlight-indent-guides
   :hook
@@ -1879,7 +1839,10 @@
  '(org-property-value ((t (:inherit fixed-pitch))) t)
  '(org-special-keyword ((t (:inherit (font-lock-comment-face fixed-pitch)))))
  '(org-table ((t (:inherit fixed-pitch))))
- '(org-tag ((t (:inherit (shadow fixed-pitch) :weight bold :height 0.8)))))
+ '(org-tag ((t (:inherit (shadow fixed-pitch) :weight bold :height 0.8))))
+ '(org-ellipsis ((t (:foreground "#D2B38C"))))
+ )
+
 
 (custom-set-faces
  '(org-level-1 ((t (:inherit outline-1 :height 1.2 :weight bold :background "#F2F3F4" :overline "#A7A6AA" :foreground "#455F39"))))
@@ -1890,13 +1853,14 @@
 
 (custom-set-faces
  '(org-block-begin-line
-   ((t (:foreground "#787787" :background "#D6DCD9" :underline "#A7A6AA" :extend nil))))
+   ((t (:foreground "#787787" :background "#E3EFD1" :box (:line-width 1 :style released-button) :slant italic
+		    :weight semi-bold))))
  '(org-block
-   ((t (:background "#A6B4A1"))))
+   ((t (:background "#fdfff4"))))
  '(org-block-end-line
-   ((t (:foreground "#008ED1" :background "#EAEAFF" :overline "#A7A6AA" :extend t :underline nil))))
+   ((t (:foreground "#008ED1" :background "#EAEAFF"))))
  '(org-meta-line
-   ((t (:background "#E7E7E7"))))
+   ((t (:background "#E7E7E7" :slant italic))))
  )
 
 ;;Unicode font setting
@@ -2384,6 +2348,7 @@
 		(flycheck-mode 1)
 		(smartparens-mode 1)
 		(company-mode 1)
+		;; (org-cdlatex-mode 1)
 		)))
 
 (add-hook 'org-log-buffer-setup-hook
@@ -2551,9 +2516,15 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
   (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
   (add-to-list 'org-structure-template-alist '("py" . "src python"))
   (add-to-list 'org-structure-template-alist '("rr" . "src R"))
-  ;; open org export pdf in Skim
-  (add-to-list 'org-file-apps '("\\.pdf\\'" . "open -a Skim %s"))
   )
+
+;; (add-hook 'org-mode-hook
+;;     #'(lambda ()
+;;         (delete '("\\.pdf\\'" . default) org-file-apps)
+;;         (add-to-list 'org-file-apps '("\\.pdf::\\([0-9]+\\)\\'" . "open -a Skim %s"))
+;; 	(add-to-list 'org-file-apps '("\\.pdf\\'" . "open -a Skim %s")))
+;;     )
+
 
 ;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ;;               NEW
@@ -2757,17 +2728,12 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
 (define-key org-mode-map (kbd "C-c h e") 'inkscape-edit);
 
 
-(use-package org-pdftools
-  :after pdf-tools
-  :config (setq org-pdftools-root-dir (concat org-directory "prints")
-                org-pdftools-search-string-separator "??")
-  (with-eval-after-load 'org
-    (org-link-set-parameters "pdftools"
-                             :follow #'org-pdftools-open
-                             :complete #'org-pdftools-complete-link
-                             :store #'org-pdftools-store-link
-                             :export #'org-pdftools-export)
-    (add-hook 'org-store-link-functions 'org-pdftools-store-link)))
+(setq org-link-file-path-type 'noabbrev)
+(delete '("\\.pdf\\'" . default) org-file-apps)
+(add-to-list 'org-file-apps '("\\.pdf\\'" . "open -a Skim %s"))
+(add-to-list 'org-file-apps
+             '("\\.pdf::\\([0-9]+\\)\\'" . "open skim://%s#page=%1"))
+
 
 (use-package org-noter
   :after pdf-tools
@@ -2823,21 +2789,30 @@ With a prefix ARG, remove start location."
   :hook
   (org-mode . org-superstar-mode)
   :custom
-  (org-ellipsis "⚡"))
+  ;; (org-ellipsis " ⚡")
+  (org-ellipsis " ▿")
+  )
 
 ;;prettify-symbols-mode setting
 (add-hook 'org-mode-hook 'prettify-symbols-mode)
-(setq-default prettify-symbols-alist '(("#+BEGIN_SRC" . "➤")
-				       ("#+END_SRC" . "➤")
-				       ("#+begin_src" . "➤")
-				       ("#+end_src" . "➤")
-				       ("#+begin_example" . "⁈")
-				       ("#+end_example" . "⁈")
-				       (">=" . "≥")
-				       ("=>" . "⇨")
-				       ("[-]" . "❍" )
-				       ("[ ]" .  "☐")
-				       ("[X]" . "☑" )))
+;; (setq-default prettify-symbols-alist '(("#+BEGIN_SRC" . "➤")
+;; 				       ("#+END_SRC" . "➤")
+;; 				       ("#+begin_src" . "➤")
+;; 				       ("#+end_src" . "➤")
+;; 				       ;; ("#+BEGIN_EXAMPLE" . "💡")
+;; 				       ;; ("#+END_EXAMPLE" . " ")
+;; 			      	       ;; ("#+BEGIN_Remark" . "📝")
+;; 				       ;; ("#+END_Remark" . " ")
+;; 				       ;; ("#+TITLE" . "📓")
+;; 				       ;; ("#+LATEX_HEADER" . "⚒")
+;; 				       ;; ("#+SETUPFILE" . "⚒")
+;; 				       ;; ("#+LATEX_CLASS" . "⚒")
+;; 				       ;; ("#+LATEX_CLASS_OPTIONS" . "⚒")
+;; 				       ;; (">=" . "≥")
+;; 				       ;; ("=>" . "⇨")
+;; 				       ("[-]" . "❍" )
+;; 				       ("[ ]" .  "☐")
+;; 				       ("[X]" . "☑" )))
 (setq prettify-symbols-unprettify-at-point 'right-edge)
 
 (use-package org-fancy-priorities
@@ -3145,9 +3120,9 @@ With a prefix ARG, remove start location."
 (require 'bibtex)
 
 (setq bibtex-autokey-year-length 4
-      bibtex-autokey-name-year-separator "-"
-      bibtex-autokey-year-title-separator "-"
-      bibtex-autokey-titleword-separator "-"
+      bibtex-autokey-name-year-separator "_"
+      bibtex-autokey-year-title-separator "_"
+      bibtex-autokey-titleword-separator "_"
       bibtex-autokey-titlewords 2
       bibtex-autokey-titlewords-stretch 1
       bibtex-autokey-titleword-length 5)
@@ -3232,10 +3207,10 @@ Based on the biblatex set of `reftex-cite-format-builtin'.")
 (use-package wordnut
   :bind ("M-!" . wordnut-lookup-current-word))
 
-(use-package auto-dictionary
-  :ensure t
-  :defer t
-  :init(add-hook 'flyspell-mode-hook (lambda () (auto-dictionary-mode 1))))
+;; (use-package auto-dictionary
+;;   :ensure t
+;;   :defer t
+;;   :init(add-hook 'flyspell-mode-hook (lambda () (auto-dictionary-mode 1))))
 
 
 
@@ -3483,35 +3458,6 @@ Based on the biblatex set of `reftex-cite-format-builtin'.")
   (setq mu4e-trash-folder  "/monash/[Gmail]/Bin")
   (setq mu4e-spam-folder "/monash/[Gmail]/Spam")
 
-
-  ;; (setq mu4e-maildir-shortcuts
-  ;; 	'((:maildir "/monash/Inbox"    :key ?i)
-  ;;       (:maildir "/monash/[Gmail]/Sent Mail" :key ?s)
-  ;;       (:maildir "/monash/[Gmail]/Bin"     :key ?t)
-  ;;       (:maildir "/monash/[Gmail]/Drafts"    :key ?d)
-  ;;       (:maildir "/monash/[Gmail]/All Mail"  :key ?a)))
-  (add-to-list 'mu4e-bookmarks
-	       (make-mu4e-bookmark
-		:name "Inbox - Monash"
-                :query "maildir:/monash/INBOX"
-                :key ?i))
-  (add-to-list 'mu4e-bookmarks
-	       (make-mu4e-bookmark
-		:name "Sent Mail - Monash"
-                :query "maildir:/monash/[Gmail]/Sent Mail"
-                :key ?s))
-  (add-to-list 'mu4e-bookmarks
-	       (make-mu4e-bookmark
-		:name "Drafts - Monash"
-                :query "maildir:/monash/[Gmail]/Drafts"
-                :key ?d))
-  (add-to-list 'mu4e-bookmarks
-	       (make-mu4e-bookmark
-		:name "Spam - Monash"
-                :query "maildir:/monash/[Gmail]/Spam"
-                :key ?t))
-
-
   (setq mu4e-contexts
       `(,(make-mu4e-context
           :name "monash"
@@ -3527,7 +3473,7 @@ Based on the biblatex set of `reftex-cite-format-builtin'.")
           :vars '((user-mail-address . "shidan.liu@monash.edu" )
                   (user-full-name . "Shidan Liu")
                   (mu4e-drafts-folder . "/monash/[Gmail]/Drafts")
-                  (mu4e-refile-folder . "monash/[Gmail]/All Mail")
+                  (mu4e-refile-folder . "/monash/[Gmail]/All Mail")
                   (mu4e-sent-folder . "/monash/[Gmail]/Sent Mail")
                   (mu4e-trash-folder . "/monash/[Gmail]/Bin")))))
 
@@ -3545,7 +3491,18 @@ Based on the biblatex set of `reftex-cite-format-builtin'.")
   ;; save attachment to desktop by default
   ;; or another choice of yours:
   (setq mu4e-attachment-dir "~/Downloads")
-)
+  ;; convert org mode to HTML automatically
+  (setq org-mu4e-convert-to-html t)
+
+  ;; need this to convert some e-mails properly
+  (setq mu4e-html2text-command "html2text -utf8 -width 72")
+  )
+
+(load "/opt/homebrew/share/emacs/site-lisp/mu/mu4e/org-mu4e.el") ;; best not to include the ending “.el” or “.elc”
+(require 'org-mu4e)
+
+(defalias 'org-mail 'org-mu4e-compose-org-mode)
+
 
 (require 'mu4e-icalendar)
 (mu4e-icalendar-setup)
@@ -3602,26 +3559,6 @@ Based on the biblatex set of `reftex-cite-format-builtin'.")
 
 ;; mu4e address completion
 (add-hook 'mu4e-compose-mode-hook 'company-mode)
-
-;;; setup org-msg
-;; (setq mail-user-agent 'mu4e-user-agent)
-;; (use-package org-msg
-;;   :config
-;;   (setq org-msg-options "html-postamble:nil H:5 num:nil ^:{} toc:nil author:nil email:nil \\n:t tex:dvipng"
-;; 	org-msg-startup "hidestars indent inlineimages"
-;; 	org-msg-greeting-fmt "\nHi *%s*,\n\n"
-;; 	org-msg-greeting-name-limit 3
-;; 	org-msg-default-alternatives '((new . (text html))
-;; 				       (reply-to-html . (text html))
-;; 				       (reply-to-text . (text)))
-;; 	org-msg-signature "
-
-;;  Regards,
-
-;;  #+begin_signature
-;;  -- *Shidan* \\\\
-;;  #+end_signature")
-;;   (org-msg-mode))
 
 
 

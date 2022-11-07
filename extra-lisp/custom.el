@@ -32,4 +32,5 @@
  '(org-special-keyword ((t (:inherit (font-lock-comment-face fixed-pitch)))))
  '(org-table ((t (:inherit fixed-pitch))))
  '(org-tag ((t (:inherit (shadow fixed-pitch) :weight bold :height 0.8))))
- '(variable-pitch ((t (:family "Noto Serif SC" :height 160)))))
+ '(variable-pitch ((t (:family "Noto Serif SC" :height 160))))
+ )
