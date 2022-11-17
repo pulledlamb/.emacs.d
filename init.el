@@ -942,10 +942,10 @@
 ;; globally go to previous position; "C-u C-SPC" to do same locally
 (global-set-key (kbd "C-c C-SPC") 'pop-global-mark)
 (define-key key-translation-map (kbd "C-d") (kbd "<deletechar>"))
-(global-set-key (kbd "C-d") 'delete-forward-char)
+;; (global-set-key (kbd "C-d") 'delete-forward-char)
 ;; evil insert mode
-(evil-define-key 'insert global-map (kbd "C-J") 'evil-next-line)
-(evil-define-key 'insert global-map (kbd "C-K") 'evil-previous-line)
+(evil-define-key 'insert global-map (kbd "C-n") 'evil-next-line)
+(evil-define-key 'insert global-map (kbd "C-p") 'evil-previous-line)
 ;; repeat command
 (global-set-key (kbd "<f4>") #'repeat)
 
@@ -1567,7 +1567,7 @@
   :config
   (setq dashboard-set-init-info nil)
   (dashboard-setup-startup-hook)
-  (setq dashboard-banner-logo-title "I CAN DO ALL THINGS?!	 ಠ_ಠ")
+  (setq dashboard-banner-logo-title "Hahahahahah??	 ಠ_ಠ")
   ;;    (setq dashboard-startup-banner 3)
   (setq dashboard-startup-banner "~/.emacs.d/fancy-splash/world_origin.png")
 
@@ -2206,6 +2206,39 @@
   (sp-local-pair 'org-mode "\\left|" "\\right|" :trigger "\\l|" :post-handlers '(sp-latex-insert-spaces-inside-pair)))
 
 
+;; location
+(setq calendar-longitude 144.946457)
+(setq calendar-latitude -37.840935)
+
+;;Sunrise and Sunset
+;;日出而作, 日落而息
+(defun diary-sunrise ()
+  (let ((dss (diary-sunrise-sunset)))
+    (with-temp-buffer
+      (insert dss)
+      (goto-char (point-min))
+      (while (re-search-forward " ([^)]*)" nil t)
+        (replace-match "" nil nil))
+      (goto-char (point-min))
+      (search-forward ",")
+      (buffer-substring (point-min) (match-beginning 0)))))
+
+(defun diary-sunset ()
+  (let ((dss (diary-sunrise-sunset))
+        start end)
+    (with-temp-buffer
+      (insert dss)
+      (goto-char (point-min))
+      (while (re-search-forward " ([^)]*)" nil t)
+        (replace-match "" nil nil))
+      (goto-char (point-min))
+      (search-forward ", ")
+      (setq start (match-end 0))
+      (search-forward " at")
+      (setq end (match-beginning 0))
+      (goto-char start)
+      (capitalize-word 1)
+      (buffer-substring start end))))
 
 
 ;; special arrow \to
@@ -2219,7 +2252,7 @@
 	org-latex-prefer-user-labels t
 	org-image-actual-width nil)
   (setq org-todo-keywords
-	'((sequence "TODO(t)" "WAIT(w@/!)" "|" "DONE(d!)" "CANCELED(c@")))
+	'((sequence "TODO(t)" "IN-PROGRESS(i@/!)" "|" "DONE(d!)" "CANCELED(c@")))
   (setq org-capture-templates
 	'(("t" "Todo" entry (file+headline "~/Documents/org/inbox.org" "Tasks")
 	   "* TODO %?\n  %i\n  %a")
@@ -2227,10 +2260,11 @@
 	   "* %?\nEntered on %U\n  %i\n  %a")))
   (setq org-default-notes-file "~/Documents/org/notes.org")
   (setq org-archive-location "~/Documents/org/archives.org::* From %s")
-  (setq org-agenda-files '("~/Documents/org/agenda.org"
-			   ;; "~/Documents/org/gcal.org"
-			   ))
+  (setq org-agenda-files
+	(file-expand-wildcards "~/Documents/org/*.org"))
   (setq org-agenda-include-diary t)
+  (setq org-agenda-diary-file "~/Documents/org/Diary") ;;2020-03-02 10:47:06
+  (setq diary-file "~/Documents/org/Diary")
 
 
   ;; not display _ and ^ as sub/superscript
@@ -2312,7 +2346,7 @@
 ;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ;;               NEW
 ;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-  (load "~/.emacs.d/.local/straight/repos/org-mode/lisp/ox-extra.el" t t)
+  ;; (load "~/.emacs.d/.local/straight/repos/org-mode/lisp/ox-extra.el" t t)
   (require 'ox-extra)
   (ox-extras-activate '(ignore-headlines))
   :custom
@@ -2367,9 +2401,12 @@
 	  (lambda()
 	    (add-to-list 'org-beamer-environments-extra
 			 '("onlyenv" "O" "\\begin{onlyenv}%a" "\\end{onlyenv}"))
+	    (add-to-list 'org-beamer-environments-extra '("only" "o" "\\only%a{" "}"))
+	    (add-to-list 'org-beamer-environments-extra '("action" "A" "\\action%a{" "}"))
 	    ;; export snippet translations
 	    (add-to-list 'org-export-snippet-translation-alist
 			 '("b" . "beamer"))))
+
 
 
 ;; stop org from prettifying sub and superscripts
@@ -2400,6 +2437,7 @@
 ;; agenda
 (global-set-key (kbd "C-c a") 'org-agenda)
 
+(setq org-tags-column 17)
 ;;(setq org-agenda-compact-blocks t)
 ;;(setq org-agenda-span 'day)
 ;; (setq org-agenda-span 14)
@@ -2415,15 +2453,16 @@
 ;; (setq org-agenda-window-setup 'current-window)
 
 ;; various
-(setq org-agenda-show-all-dates t)
-(setq org-agenda-skip-deadline-if-done t)
-(setq org-agenda-skip-scheduled-if-done t)
-(setq org-deadline-warning-days 15)
-(setq org-agenda-start-on-weekday nil)
-(setq org-reverse-note-order t)
-(setq org-agenda-start-with-log-mode t)
-(setq org-log-done 'time)
-(setq org-log-into-drawer t)
+(setq org-agenda-show-all-dates t
+      org-agenda-skip-deadline-if-done t
+      org-agenda-skip-scheduled-if-done t
+      org-deadline-warning-days 5
+      org-agenda-start-on-weekday nil
+      org-reverse-note-order t
+      org-agenda-start-with-log-mode t
+      org-log-done 'time
+      org-log-into-drawer t
+      org-agenda-include-deadlines t)
 
 
 ;; custom agenda views
@@ -2529,6 +2568,23 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
 ;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ;;               NEW
 ;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+;; Set the times to display in the time grid
+;;---------------------------------------------
+;;org-agenda-time-grid
+;;--------------------------------------------
+(setq org-agenda-time-grid (quote ((daily today remove-match)
+                                   (300
+                                    600
+                                    900
+                                    1200
+                                    1500
+                                    1800
+                                    2100
+                                    2400)
+                                   "......"
+                                   "-----------------------------------------------------"
+                                   )))
+;; Compact the block agenda view (disabled)
 (use-package org-super-agenda
   :hook (after-init . org-super-agenda-mode)
   :init
@@ -2544,32 +2600,22 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
     (s-matches? "[0-9+:hdwmy/ 	.-]" item))
 
   (setq org-agenda-custom-commands
-        '(("R" "Review"
-           (
-            (todo "ACTIVE!" ((org-agenda-overriding-header (concat "Active projects -- pending actions"))))
-            (todo "WAITING" ((org-agenda-overriding-header (concat "Waiting items"))))
-            (todo "HOLD!" ((org-agenda-overriding-header (concat "Projects on hold -- no pending actions"))))
-            ;;(todo "STARTED" ((org-agenda-overriding-header (concat "ITEMS in progress"))))
-                                        ;(agenda "" ((org-agenda-ndays 21))) ;; review upcoming deadlines and appointments
-                                        ;                                 ;; type "l" in the agenda to review logged items
-            ;;(agenda "" ((org-super-agenda-groups '((:auto-group t)))) (org-agenda-list)) ;;(:auto-group t) (:name "Scheduled Today" :scheduled today)
-            (agenda "" ((org-super-agenda-groups '(
-                                                   (:name "⏰ Today               " :time-grid t)
-                                                   (:name "⭐⭐⭐  Due Today ⭐⭐⭐    " :deadline today :scheduled today)
-                                                   (:name "⇒ Due soon             " :deadline future)
-                                                   (:name "⚠ OVERDUE! ⚠           " :deadline past)
-                                                   (:name "⇒ Consider soon        " :scheduled future)
-                                                   (:name "⚠ Behind               " :and (:scheduled past :not (:category "catchup")))
-                                                   (:name "⚠ Catchup              " :category "catchup")
-                                                   )))
-                    (org-agenda nil "a")
-                    )
-            (todo "TODO" ((org-agenda-overriding-header (concat "All to-do ITEMS")))) ;; review waiting items
-            (todo "1DAY!" ((org-agenda-overriding-header (concat "Inactive projects"))))
-            ;;(stuck "") ;; review stuck projects as designated by org-stuck-projects
-            ;; ...other commands here
-            )
-           )
+        '((" " "Review"
+	   (
+	    (agenda "" ((org-agenda-overriding-header "Today's Schedule:")
+			(org-agenda-span 'day)
+			(org-agenda-ndays 1)
+			(org-agenda-start-on-weekday nil)
+			(org-agenda-start-day "+0d")
+			(org-agenda-entry-text-mode t)))
+
+	    (agenda "" ((org-agenda-overriding-header "Week At A Glance:")
+ 					    (org-agenda-ndays 5)
+ 					    (org-agenda-start-day "+1d")
+ 					    ;; (org-agenda-skip-function '(org-agenda-skip-entry-if 'scheduled))
+ 					    (org-agenda-prefix-format '((agenda . "  %-12:c%?-12t %s [%b] ")))
+					    (org-agenda-include-diary nil)))
+           ))
           ("P" "Projects"
            (
             (todo "ACTIVE!" ((org-agenda-overriding-header (concat "Active projects -- pending actions"))))
@@ -2587,23 +2633,21 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
            )
 
           ("A" "Agenda"
-           (
-            (agenda "" ((org-super-agenda-groups '(
-                                                   (:name "⏰ Today              " :and (:time-grid t :not (:scheduled future)))
+           ((agenda "" ((org-super-agenda-groups '(
+                                                   ;; (:name "⏰ Today              " :and (:not (:deadline furture) :not (:scheduled future)))
                                                    (:name "⭐⭐⭐ Due Today ⭐⭐⭐    " :deadline today :scheduled today)
                                                    (:name "⇒ Due soon            " :deadline future)
-                                                   (:name "⚠ OVERDUE! ⚠          " :deadline past)
-                                                   (:name "⇒ Consider soon       " :scheduled future)
+                                                   (:name "⚠ OVERDUE! ⚠          " :order 1 :deadline past)
+                                                   (:name "⇒ Consider soon       " :order 2 :scheduled future)
                                                    (:name "⚠ Behind              " :and (:scheduled past :not (:category "catchup")))
-                                                   (:name "⚠ Catchup             " :category "catchup")
-                                                   )))
-                    (org-agenda nil "a")
-                    )	  )
-           )
-
-
-          ))
-
+                                                   (:name "⚠ Catchup             " :category "catchup")))
+			(org-agenda-time-grid nil)
+			(org-agenda-include-diary nil)
+			)
+		    (org-agenda nil "a")))
+	   )
+	  )
+	)
   )
 ;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ;;               NEW
@@ -3127,7 +3171,7 @@ With a prefix ARG, remove start location."
       bibtex-autokey-titlewords-stretch 1
       bibtex-autokey-titleword-length 5)
 
-(define-key bibtex-mode-map (kbd "H-b") 'org-ref-bibtex-hydra/body)
+(define-key bibtex-mode-map (kbd "s-b") 'org-ref-bibtex-hydra/body)
 
 ;; ox-pandoc needed for org-ref
 (use-package ox-pandoc
@@ -3458,6 +3502,10 @@ Based on the biblatex set of `reftex-cite-format-builtin'.")
   (setq mu4e-trash-folder  "/monash/[Gmail]/Bin")
   (setq mu4e-spam-folder "/monash/[Gmail]/Spam")
 
+  (setq mu4e-maildir-shortcuts
+        '(("/monash/[Gmail]/drafts" . ?d)))
+
+
   (setq mu4e-contexts
       `(,(make-mu4e-context
           :name "monash"
@@ -3475,7 +3523,8 @@ Based on the biblatex set of `reftex-cite-format-builtin'.")
                   (mu4e-drafts-folder . "/monash/[Gmail]/Drafts")
                   (mu4e-refile-folder . "/monash/[Gmail]/All Mail")
                   (mu4e-sent-folder . "/monash/[Gmail]/Sent Mail")
-                  (mu4e-trash-folder . "/monash/[Gmail]/Bin")))))
+                  (mu4e-trash-folder . "/monash/[Gmail]/Bin")
+		  (mu4e-compose-signature . (concat "Regards,\n" "Shidan"))))))
 
   (setq mu4e-context-policy 'pick-first) ;; start with the first (default) context;
   (setq mu4e-compose-context-policy 'ask) ;; ask for context if no context matches;
