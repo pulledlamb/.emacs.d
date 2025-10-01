@@ -26,6 +26,31 @@
 ;;; Code:
 ;;; FUNDEMENTAL
 
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+;;              recompilation temp fix @emac29.4
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+(defun fixed-native-compile-async-skip-p
+        (native-compile-async-skip-p file load selector)
+    (let* ((naive-elc-file (file-name-with-extension file "elc"))
+           (elc-file       (replace-regexp-in-string
+                               "\\.el\\.elc$" ".elc" naive-elc-file)))
+        (or (gethash elc-file comp--no-native-compile)
+            (funcall native-compile-async-skip-p file load selector))))
+
+(advice-add 'native-compile-async-skip-p
+    :around 'fixed-native-compile-async-skip-p)
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+;;                end of temp fix
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+;;                dvorak remap
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+(define-key key-translation-map "\C-t" "\C-x")
+
+
 (defvar native-comp-deferred-compilation-deny-list nil)
 ;; Customize when to check package modification (much much faster)
 (setq-default straight-check-for-modifications '(check-on-save find-when-checking))
@@ -103,11 +128,470 @@
 (setq auto-save-file-name-transforms
       `((".*" ,(no-littering-expand-var-file-name "auto-save/") t)))
 
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+;;                  orgmode w/ latex preview
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+;; special arrow \to
+(use-package org
+  ;; :straight (:type built-in)
+  :defer
+  :straight `(org
+              :fork (:host nil
+                     :repo "https://git.tecosaur.net/tec/org-mode.git"
+                     :branch "dev"
+                     :remote "tecosaur")
+              :files (:defaults "etc")
+              :build t
+              :pre-build
+              (with-temp-file "org-version.el"
+               (require 'lisp-mnt)
+               (let ((version
+                      (with-temp-buffer
+                        (insert-file-contents "lisp/org.el")
+                        (lm-header "version")))
+                     (git-version
+                      (string-trim
+                       (with-temp-buffer
+                         (call-process "git" nil t nil "rev-parse" "--short" "HEAD")
+                         (buffer-string)))))
+                (insert
+                 (format "(defun org-release () \"The release version of Org.\" %S)\n" version)
+                 (format "(defun org-git-version () \"The truncate git commit hash of Org mode.\" %S)\n" git-version)
+                 "(provide 'org-version)\n")))
+              :pin nil)
+  :config
+  (plist-put org-latex-preview-appearance-options
+             :page-width 0.8)
+
+  ;; Use dvisvgm to generate previews
+  ;; ;; You don't need this, it's the default:
+  ;; (setq org-latex-preview-process-default 'dvisvgm)
+
+  (require 'ox-latex )
+  ;; ;; set latex to xelatex
+  ;; (setq org-latex-pdf-process
+  ;; 	'("xelatex --shell-escape  -interaction nonstopmode -output-directory %o %f"
+  ;; 	  "bibtex %b"
+  ;; 	  "xelatex --shell-escape  -interaction nonstopmode -output-directory %o %f"
+  ;; 	  "xelatex --shell-escape  -interaction nonstopmode -output-directory %o %f"))
+
+  ;; (setq org-latex-pdf-process
+  ;;       '("lualatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+  ;;         "bibtex %b"
+  ;; 	  ;; "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+  ;;         ;; "biber %b"
+  ;;         "lualatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+  ;; 	  "lualatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
+  (setq org-latex-pdf-process
+    '("export PATH=\"/Library/TeX/texbin/:$PATH\";latexmk -f -pdf -%latex -interaction=nonstopmode -output-directory=%o %f"))
+  ;; (setq org-latex-pdf-process
+  ;; 	'("pdflatex -interaction nonstopmode -output-directory %o %f"
+  ;;         "bibtex %b"
+  ;;         "pdflatex -interaction nonstopmode -output-directory %o %f"
+  ;; 	  "pdflatex -interaction nonstopmode -output-directory %o %f"))
+
+  ;; (setq org-latex-compiler "xelatex")
+  ;; (setq org-latex-pdf-process
+  ;;     (list (concat "latexmk -"
+  ;;                   org-latex-compiler
+  ;;                   " -recorder -synctex=1 -bibtex-cond %b")))
+
+  ;; Turn on auto-mode, it's built into Org and much faster/more featured than
+  ;; org-fragtog. (Remember to turn off/uninstall org-fragtog.)
+  ;; (add-hook 'org-mode-hook 'org-latex-preview-auto-mode)
+
+  ;; Enable consistent equation numbering
+  (setq org-latex-preview-numbered t)
+  (setq org-latex-preview-live t)
+
+  (setq org-highlight-latex-and-related '(native))
+					; Highlight inline LaTeX code
+
+  (let ((factor (- (/ (face-attribute 'default :height)
+                      100.0)
+                   0.025)))
+    (plist-put org-latex-preview-appearance-options :scale factor)
+    (plist-put org-latex-preview-appearance-options :zoom  factor))
+
+  (let ((dvisvgm (alist-get 'dvisvgm org-latex-preview-process-alist))
+	(libgs "/opt/homebrew/opt/ghostscript/lib/libgs.dylib"))
+    (plist-put dvisvgm :image-converter
+               `(,(concat "dvisvgm --page=1- --optimize --clipjoin --relative --no-fonts"
+                          " --libgs=" libgs
+
+                          ;; Default is "-v3" here, but it does not seem to work correctly
+                          ;; on my client.
+                          " --bbox=preview -v4 -o %B-%%9p.svg %f"))))
+
+
+
+  ;; ;; Default LaTeX preview image directory
+  ;; (setq org-preview-latex-image-directory
+  ;; 	(expand-file-name "ltximg/" user-emacs-directory))
+
+  ;; (setq org-persist-directory (expand-file-name "org-persist" user-emacs-directory))
+
+  ;; ;; ;; Preview functions
+
+  ;; (defun lsd/org-preview-fragments ()
+  ;;   (interactive)
+  ;;   (call-interactively 'org-latex-preview-clear-cache)
+  ;;   (org-latex-preview 'buffer)
+  ;;   (org-redisplay-inline-images))
+  ;; (bind-keys :map org-mode-map
+  ;; 	     ("C-c p" . lsd/org-preview-fragments))
+
+  (setq org-startup-indented t
+	org-latex-precompile nil
+	org-startup-with-inline-images t
+	org-hide-emphasis-markers t
+	org-latex-prefer-user-labels t
+	org-image-actual-width nil
+	org-export-allow-bind-keywords t)
+  (setq org-todo-keywords
+	'((sequence "TODO(t)" "IN-PROGRESS(i@/!)" "|" "DONE(d!)" "CANCELED(c@)")))
+  (setq org-capture-templates
+	'(("t" "Todo" entry (file+headline "~/Documents/org/monash.org" "Tasks")
+	   "* TODO %?\n  %i\n  %a")
+	  ("j" "Journal" entry (file+olp+datetree "~/Documents/org/journal.org")
+	   "* %?\nEntered on %U\n  %i\n  %a")
+	  ("m" "Email Workflow")
+	  ("mf" "Follow Up" entry (file+olp "~/Documents/org/monash.org" "Follow Up")
+           "* TODO Follow up with %:fromname on %a\nSCHEDULED:%t\nDEADLINE: %(org-insert-time-stamp (org-read-date nil t \"+2d\"))\n\n%i")
+	  ("mr" "Read Later" entry (file+olp "~/Documents/org/monash.org" "Read Later")
+	   "* TODO Read %:subject\nSCHEDULED:%t\nDEADLINE: %(org-insert-time-stamp (org-read-date nil t \"+2d\"))\n\n%a\n\n%i")
+	  ))
+  (setq org-default-notes-file "~/Documents/org/notes.org")
+  (setq org-archive-location "~/Documents/org/archives.org::* From %s")
+  (setq org-agenda-files
+	(file-expand-wildcards "~/Documents/org/*.org"))
+  (setq org-agenda-include-diary t)
+  (setq org-agenda-diary-file "~/Documents/org/Diary") ;;2020-03-02 10:47:06
+  (setq diary-file "~/Documents/org/Diary")
+
+
+  ;; not display _ and ^ as sub/superscript
+  (setq org-use-sub-superscripts nil)
+
+  ;; allow alphabetical plain lists
+  (setq org-list-allow-alphabetical t)
+
+  ;; turn off org-element-cache
+  (setq org-element-use-cache  nil)
+
+  ;;src setting
+  (setq org-src-fontify-natively t)
+
+  (setq org-latex-listings 'minted)
+  ;; (setq org-latex-src-block-backend 'minted)
+  (setq org-export-latex-listings 'minted)
+  ;; (add-to-list 'org-latex-packages-alist '("" "minted"))
+  (setq org-latex-minted-options '(("breaklines" "true")
+                                   ("breakanywhere" "true")
+				   ("fontsize" "\\scriptsize")))
+
+  (add-to-list 'org-latex-classes
+               '("amsart"
+                 "\\documentclass[a4paper]{amsart}
+\\let\\email\\relax
+                     "
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+                 ("\\paragraph{%s}" . "\\paragraph*{%s}")
+                 ("\\subparagraph{%s}" . "\\subparagraph*{%s}")
+                 )
+               )
+  (add-to-list 'org-latex-classes
+               '("svjour3" "\\documentclass{svjour3}"
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+                 ("\\paragraph{%s}" . "\\paragraph*{%s}")
+                 ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
+  ;; Mimore class is a latex class for writing articles.
+  (add-to-list 'org-latex-classes
+               '("mimore"
+                 "\\documentclass{mimore}
+ [NO-DEFAULT-PACKAGES]
+ [PACKAGES]
+ [EXTRA]"
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+                 ("\\paragraph{%s}" . "\\paragraph*{%s}")
+                 ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
+
+  ;; Mimosis is a class I used to write my Ph.D. thesis.
+  (add-to-list 'org-latex-classes
+               '("mimosis"
+                 "\\documentclass{mimosis}
+ [NO-DEFAULT-PACKAGES]
+ [PACKAGES]
+ [EXTRA]
+\\newcommand{\\mboxparagraph}[1]{\\paragraph{#1}\\mbox{}\\\\}
+\\newcommand{\\mboxsubparagraph}[1]{\\subparagraph{#1}\\mbox{}\\\\}"
+                 ("\\chapter{%s}" . "\\chapter*{%s}")
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+                 ("\\mboxparagraph{%s}" . "\\mboxparagraph*{%s}")
+                 ("\\mboxsubparagraph{%s}" . "\\mboxsubparagraph*{%s}")))
+
+  (add-to-list 'org-latex-classes
+               '("memoir"
+		 "\\documentclass{memoir}"
+		 ("\\chapter{%s}" . "\\chapter*{%s}")
+		 ("\\section{%s}" . "\\section*{%s}")
+		 ("\\subsection{%s}" . "\\subsection*{%s}")
+		 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")))
+  ;; Elsarticle is Elsevier class for publications.
+  (add-to-list 'org-latex-classes
+               '("elsarticle"
+                 "\\documentclass{elsarticle}
+ [NO-DEFAULT-PACKAGES]
+ [PACKAGES]
+ [EXTRA]"
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+                 ("\\paragraph{%s}" . "\\paragraph*{%s}")
+                 ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
+
+
+  ;; (load "~/.emacs.d/.local/straight/repos/org-mode/lisp/ox-extra.el" t t)
+  (require 'ox-extra)
+  (ox-extras-activate '(ignore-headlines))
+  :custom
+  (org-support-shift-select 'always)
+  (org-babel-load-languages '((emacs-lisp . t)
+			      (python . t)
+			      (R . t)
+			      (latex . t)))
+
+  ;;local keybinding
+
+  :bind
+  (:map org-mode-map
+	("s-<up>" . org-previous-visible-heading)
+	("s-<down>" . org-next-visible-heading)
+	("C-c a" . org-agenda)
+	("C-c <deletechar>" . org-deadline)
+	("C-c c" . org-capture)
+	("C-c C-r" . org-archive-subtree)
+	("C-c t" . counsel-org-tag)
+	("C-c l" . counsel-org-link)
+	("C-x j" . org-cdlatex-mode)
+	("C-c k" . org-mark-ring-goto))
+
+
+
+
+  :hook
+  (org-mode . (lambda ()
+		(variable-pitch-mode 1)
+		(visual-line-mode 1)
+		(display-line-numbers-mode -1)
+		(org-toggle-pretty-entities)
+		(flycheck-mode 1)
+		(smartparens-mode 1)
+		;; (company-mode 1)
+		;; (org-cdlatex-mode 1)
+		)))
+
+
+
+(add-hook 'org-log-buffer-setup-hook
+	  (lambda()
+	    (setq ispell-local-dictionary "en_US")))
+(add-hook 'org-mode-hook
+	  (lambda ()
+            (LaTeX-add-environments "equation")
+	    (LaTeX-add-environments "equation*")
+	    (LaTeX-add-environments "lemma")
+	    (LaTeX-add-environments "theorem")
+	    (LaTeX-add-environments "example")
+	    (LaTeX-add-environments "Remark")
+	    (LaTeX-add-environments "proposition")))
+(add-hook 'org-beamer-mode-hook
+	  (lambda()
+	    (add-to-list 'org-beamer-environments-extra
+			 '("onlyenv" "O" "\\begin{onlyenv}%a" "\\end{onlyenv}"))
+	    (add-to-list 'org-beamer-environments-extra '("only" "o" "\\only%a{" "}"))
+	    (add-to-list 'org-beamer-environments-extra '("action" "A" "\\action%a{" "}"))
+	    ;; export snippet translations
+	    (add-to-list 'org-export-snippet-translation-alist
+			 '("b" . "beamer"))))
+
+;; Numbering
+(defun org-export-get-headline-number (headline info)
+    "Return numbered HEADLINE numbering as a list of numbers.
+    INFO is a plist holding contextual information."
+    (and (org-export-numbered-headline-p headline info)
+         (let* (
+                (nums (cdr (assq headline (plist-get info :headline-numbering))))
+                (root-heading (let ((parent headline)(temp)) (while (and (setq temp (org-element-property :parent parent)) (eq 'headline (org-element-type temp))) (setq parent temp)) parent))
+                (appendix (member "appendix" (org-element-property :tags root-heading))))
+           (if (eq 1 (length nums))
+               ;; if it's a part get roman numbers
+               (list (nth (car nums) '("Z" "I" "II" "III" "IV" "V" "VI" "VII" "VIII" "IX" "X")))
+               (let ((nums (cdr nums))) ; remove part number
+		 (cons (if appendix
+			   (concat "A." (substring (number-to-string nums) 1 -1))
+                         )
+                       (cdr nums))
+		 )))))
+(defun number-to-string (number)
+  (format "%s" number))
+
+;; Break inheritance of UNNUMBERED
+(defun org-export-numbered-headline-p (headline info)
+  "Return a non-nil value if HEADLINE element should be numbered.
+INFO is a plist used as a communication channel."
+  (unless (org-not-nil (org-export-get-node-property :UNNUMBERED headline  ))
+                                                      ; removing `t` here ↑
+                                                      ; removes inheritance
+    (let ((sec-num (plist-get info :section-numbers))
+      (level (org-export-get-relative-level headline info)))
+      (if (wholenump sec-num) (<= level sec-num) sec-num))))
+
+
+;; place CAPTION and LABEL in the right order
+(defun org-latex--caption/label-string (element info)
+  "Return caption and label LaTeX string for ELEMENT.
+
+  INFO is a plist holding contextual information.  If there's no
+  caption nor label, return the empty string.
+
+  For non-floats, see `org-latex--wrap-label'."
+  (let* ((label (org-latex--label element info nil t))
+     (main (org-export-get-caption element))
+     (attr (org-export-read-attribute :attr_latex element))
+     (type (org-element-type element))
+     (nonfloat (or (and (plist-member attr :float)
+                (not (plist-get attr :float))
+                main)
+               (and (eq type 'src-block)
+                (not (plist-get attr :float))
+                (null (plist-get info :latex-listings)))))
+     (short (org-export-get-caption element t))
+     (caption-from-attr-latex (plist-get attr :caption)))
+    (cond
+     ((org-string-nw-p caption-from-attr-latex)
+      (concat caption-from-attr-latex "\n"))
+     ((and (not main) (equal label "")) "")
+     ((not main) label)
+     ;; Option caption format with short name.
+     (t
+      (format (if nonfloat "\\captionof{%s}%s{%s}\n%s"
+        "\\caption%s%s{%s}\n%s")
+          (let ((type* (if (eq type 'latex-environment)
+                   (org-latex--environment-type element)
+                 type)))
+        (if nonfloat
+            (cl-case type*
+              (paragraph "figure")
+              (image "figure")
+              (special-block "figure")
+              (src-block (if (plist-get info :latex-listings)
+                     "listing"
+                   "figure"))
+              (t (symbol-name type*)))
+          ""))
+          (if short (format "[%s]" (org-export-data short info)) "")
+          (org-export-data main info)
+          label)))))
+
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+;;                   end of orgmode
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 ;; window split
 (setq split-height-threshold 1)
 (setq split-width-threshold nil)
 
+
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+;;                     centaur tabs
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+;; (use-package centaur-tabs
+;;   :init
+;;   (setq centaur-tabs-enable-key-bindings t)
+;;   :config
+;;   (setq centaur-tabs-style "bar"
+;;         centaur-tabs-height 32
+;;         centaur-tabs-set-icons t
+;;         centaur-tabs-show-new-tab-button t
+;;         centaur-tabs-set-modified-marker t
+;;         centaur-tabs-show-navigation-buttons t
+;;         centaur-tabs-set-bar 'under
+;;         centaur-tabs-show-count nil
+;;         ;; centaur-tabs-label-fixed-length 15
+;;         ;; centaur-tabs-gray-out-icons 'buffer
+;;         ;; centaur-tabs-plain-icons t
+;;         x-underline-at-descent-line t
+;;         centaur-tabs-left-edge-margin nil)
+;;   (centaur-tabs-change-fonts (face-attribute 'default :font) 110)
+;;   (centaur-tabs-headline-match)
+;;   ;; (centaur-tabs-enable-buffer-alphabetical-reordering)
+;;   ;; (setq centaur-tabs-adjust-buffer-order t)
+;;   (centaur-tabs-mode t)
+;;   (setq uniquify-separator "/")
+;;   (setq uniquify-buffer-name-style 'forward)
+;;   (defun centaur-tabs-buffer-groups ()
+;;     "`centaur-tabs-buffer-groups' control buffers' group rules.
+
+;; Group centaur-tabs with mode if buffer is derived from `eshell-mode' `emacs-lisp-mode' `dired-mode' `org-mode' `magit-mode'.
+;; All buffer name start with * will group to \"Emacs\".
+;; Other buffer group by `centaur-tabs-get-group-name' with project name."
+;;     (list
+;;      (cond
+;;       ;; ((not (eq (file-remote-p (buffer-file-name)) nil))
+;;       ;; "Remote")
+;;       ((or (string-equal "*" (substring (buffer-name) 0 1))
+;;            (memq major-mode '(magit-process-mode
+;;                               magit-status-mode
+;;                               magit-diff-mode
+;;                               magit-log-mode
+;;                               magit-file-mode
+;;                               magit-blob-mode
+;;                               magit-blame-mode
+;;                               )))
+;;        "Emacs")
+;;       ((derived-mode-p 'prog-mode)
+;;        "Editing")
+;;       ((derived-mode-p 'dired-mode)
+;;        "Dired")
+;;       ((memq major-mode '(helpful-mode
+;;                           help-mode))
+;;        "Help")
+;;       ((memq major-mode '(org-mode
+;;                           org-agenda-clockreport-mode
+;;                           org-src-mode
+;;                           org-agenda-mode
+;;                           org-beamer-mode
+;;                           org-indent-mode
+;;                           org-bullets-mode
+;;                           org-cdlatex-mode
+;;                           org-agenda-log-mode
+;;                           diary-mode))
+;;        "OrgMode")
+;;       (t
+;;        (centaur-tabs-get-group-name (current-buffer))))))
+;;   :hook
+;;   (dashboard-mode . centaur-tabs-local-mode)
+;;   (term-mode . centaur-tabs-local-mode)
+;;   (calendar-mode . centaur-tabs-local-mode)
+;;   (org-agenda-mode . centaur-tabs-local-mode)
+;;   :bind
+;;   ("C-<prior>" . centaur-tabs-backward)
+;;   ("C-<next>" . centaur-tabs-forward)
+;;   ("C-S-<prior>" . centaur-tabs-move-current-tab-to-left)
+;;   ("C-S-<next>" . centaur-tabs-move-current-tab-to-right)
+;;   (:map evil-normal-state-map
+;;         ("g t" . centaur-tabs-forward)
+;;         ("g T" . centaur-tabs-backward)))
 
 
 ;;; EDITOR
@@ -563,8 +1047,8 @@
   (exec-path-from-shell-initialize))
 
 
-(use-package use-package-ensure-system-package
-  :after exec-path-from-shell) ;;extend use-package, put after exec-path-from-shell
+;(use-package use-package-ensure-system-package
+;  :after exec-path-from-shell) ;;extend use-package, put after exec-path-from-shell
 
 (use-package popwin
   :hook
@@ -633,7 +1117,7 @@
   :custom
   (corfu-cycle t)                 ; Allows cycling through candidates
   (corfu-auto t)                  ; Enable auto completion
-  (corfu-auto-prefix 2)
+  (corfu-auto-prefix 4)
   (corfu-auto-delay 0.75)
   (corfu-popupinfo-delay '(0.5 . 0.2))
   (corfu-preview-current 'insert) ; Do not preview current candidate
@@ -649,7 +1133,7 @@
               ("s-TAB"      . corfu-previous)
               ([backtab]    . corfu-previous)
               ("s-<return>" . corfu-insert)
-              ("C-q"        . corfu-quit))
+              ("s-q"        . corfu-quit))
 
   :init
   (global-corfu-mode)
@@ -1269,33 +1753,19 @@
   ("S-<f9>" . highlight-symbol-prev)
   ("M-<f9>" . highlight-symbol-query-replace))
 
-(use-package all-the-icons
-  :if (display-graphic-p)
-  :config
-  (setq inhibit-compacting-font-caches t))
+(require 'nerd-icons)
 
-(use-package all-the-icons-dired
-  :if window-system
-  ;;need to run all-the-icons-install-fonts first to avoid grabled icon
+(use-package nerd-icons-dired
   :hook
-  (dired-mode . all-the-icons-dired-mode))
+  (dired-mode . nerd-icons-dired-mode))
 
 ;; all the icons for completion framework (e.g. vertico)
-(use-package all-the-icons-completion
-  :hook
-  (after-init . all-the-icons-completion-mode)
+(use-package nerd-icons-completion
+  :after marginalia
   :config
-  (add-hook 'marginalia-mode-hook #'all-the-icons-completion-marginalia-setup))
+  (nerd-icons-completion-mode)
+  (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
 
-
-;; show emoji
-;; (use-package emojify
-;;   :hook
-;;   (after-init . global-emojify-mode)
-;;   :custom
-;;   (emojify-display-style 'unicode)
-;;   (emojify-download-emojis-p t)
-;;   (emojify-emoji-styles '(ascii github unicode)))
 
 ;; defer if it's slow
 (use-package dashboard
@@ -1398,7 +1868,7 @@
   (if (display-graphic-p)
       (progn
 	;; English font
-	(set-face-attribute 'default nil :font (format "%s:pixelsize=%d" "SF Mono" 15))
+	(set-face-attribute 'default nil :font (format "%s:pixelsize=%d" "Iosevka" 15))
 	;; CJK font
 	(dolist (charset '(kana han symbol cjk-misc bopomofo))
 	  (set-fontset-font (frame-parameter nil 'font)
@@ -1438,7 +1908,9 @@
   (load-theme 'solo-jazz t))
 (use-package twilight-bright-theme :defer t )
 (use-package ample-theme :defer t )
-(use-package eziam-theme :defer t ) ;;almost perfect light theme
+;; (use-package eziam-theme :defer t ) ;;almost perfect light theme
+;; (use-package eziam-light-theme
+;;     :ensure eziam-theme))
 (use-package spacemacs-common :defer t :straight spacemacs-theme)
 (use-package doom-themes
   :defer t
@@ -1552,7 +2024,30 @@
   :config
   (add-hook 'org-mode-hook #'org-modern-mode)
   (add-hook 'org-agenda-finalize-hook #'org-modern-agenda))
+(setq
+ ;; Edit settings
+ org-auto-align-tags nil
+ org-tags-column 0
+ org-special-ctrl-a/e t
+ org-insert-heading-respect-content t
+ org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◆" "▶")
+ org-modern-list '((43 . "➤")
+		   (45 . "–")
+                   (42 . "•"))
 
+ ;; Org styling, hide markup etc.
+ ;; org-hide-emphasis-markers t
+
+ ;; Agenda styling
+ org-agenda-tags-column 0
+ org-agenda-block-separator ?─
+ org-agenda-time-grid
+ '((daily today require-timed)
+   (800 1000 1200 1400 1600 1800 2000)
+   " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄")
+ org-agenda-current-time-string
+ "◀── now ─────────────────────────────────────────────────")
+(setq org-ellipsis " ▿")
 
 ;;Unicode font setting
 (when (member "Symbola" (font-family-list))
@@ -1600,8 +2095,7 @@
 ;;==============================
 
 ;; Interpreter choice
-(setq python-shell-interpreter "ipython"
-      python-shell-interpreter-args "-i --simple-prompt --InteractiveShell.display_page=True")
+(setq python-shell-interpreter "/usr/bin/python3")
 ;;(setq python-shell-interpreter "python3.9")
 
 ;;python-style indent
@@ -1925,261 +2419,17 @@
       (capitalize-word 1)
       (buffer-substring start end))))
 
-
-;; special arrow \to
-(use-package org
-  :straight (:type built-in)
-  :config
-  (setq org-startup-indented t
-	org-startup-with-inline-images t
-	org-hide-emphasis-markers t
-	org-latex-prefer-user-labels t
-	org-image-actual-width nil)
-  (setq org-todo-keywords
-	'((sequence "TODO(t)" "IN-PROGRESS(i@/!)" "|" "DONE(d!)" "CANCELED(c@)")))
-  (setq org-capture-templates
-	'(("t" "Todo" entry (file+headline "~/Documents/org/monash.org" "Tasks")
-	   "* TODO %?\n  %i\n  %a")
-	  ("j" "Journal" entry (file+olp+datetree "~/Documents/org/journal.org")
-	   "* %?\nEntered on %U\n  %i\n  %a")
-	  ("m" "Email Workflow")
-	  ("mf" "Follow Up" entry (file+olp "~/Documents/org/monash.org" "Follow Up")
-           "* TODO Follow up with %:fromname on %a\nSCHEDULED:%t\nDEADLINE: %(org-insert-time-stamp (org-read-date nil t \"+2d\"))\n\n%i")
-	  ("mr" "Read Later" entry (file+olp "~/Documents/org/monash.org" "Read Later")
-	   "* TODO Read %:subject\nSCHEDULED:%t\nDEADLINE: %(org-insert-time-stamp (org-read-date nil t \"+2d\"))\n\n%a\n\n%i")
-	  ))
-  (setq org-default-notes-file "~/Documents/org/notes.org")
-  (setq org-archive-location "~/Documents/org/archives.org::* From %s")
-  (setq org-agenda-files
-	(file-expand-wildcards "~/Documents/org/*.org"))
-  (setq org-agenda-include-diary t)
-  (setq org-agenda-diary-file "~/Documents/org/Diary") ;;2020-03-02 10:47:06
-  (setq diary-file "~/Documents/org/Diary")
+(use-package leetcode
+  :defer t
+  :init
+  (setq leetcode-prefer-language "python3"
+        leetcode-prefer-sql "mysql"
+        leetcode-save-solutions t
+        leetcode-directory "~/SLIU/randomness/leetcode")
+  (add-hook 'leetcode-solution-mode-hook
+            (lambda() (flycheck-mode -1))))
 
 
-  ;; not display _ and ^ as sub/superscript
-  (setq org-use-sub-superscripts nil)
-
-  ;; allow alphabetical plain lists
-  (setq org-list-allow-alphabetical t)
-
-  ;; turn off org-element-cache
-  (setq org-element-use-cache  nil)
-
-  ;;src setting
-  (setq org-src-fontify-natively t)
-
-  (setq org-latex-listings 'minted)
-  ;; (setq org-latex-src-block-backend 'minted)
-  (setq org-export-latex-listings 'minted)
-  ;; (add-to-list 'org-latex-packages-alist '("" "minted"))
-  (setq org-latex-minted-options '(("breaklines" "true")
-                                   ("breakanywhere" "true")
-				   ("fontsize" "\\scriptsize")))
-
-  (require 'ox-latex )
-  ;; sett latex to xelatex
-  ;; (setq org-latex-pdf-process
-  ;; 	'("xelatex -8bit --shell-escape  -interaction=nonstopmode -output-directory %o %f"
-  ;; 	  "xelatex -8bit --shell-escape  -interaction=nonstopmode -output-directory %o %f"
-  ;; 	  "xelatex -8bit --shell-escape  -interaction=nonstopmode -output-directory %o %f"))
-  (setq org-latex-pdf-process
-           '("lualatex -shell-escape -interaction nonstopmode -output-directory %o %f"
-             "bibtex %b"
-	     ;; "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
-             ;; "biber %b"
-             "lualatex -shell-escape -interaction nonstopmode -output-directory %o %f"
-             "lualatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
-  ;; (setq org-latex-pdf-process
-  ;;     '("pdflatex -interaction nonstopmode -output-directory %o %f"
-  ;;       "biber %b"
-  ;;       "pdflatex -interaction nonstopmode -output-directory %o %f"
-  ;;       "pdflatex -interaction nonstopmode -output-directory %o %f"))
-  ;; Mimore class is a latex class for writing articles.
-  (add-to-list 'org-latex-classes
-               '("mimore"
-                 "\\documentclass{mimore}
- [NO-DEFAULT-PACKAGES]
- [PACKAGES]
- [EXTRA]"
-                 ("\\section{%s}" . "\\section*{%s}")
-                 ("\\subsection{%s}" . "\\subsection*{%s}")
-                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
-                 ("\\paragraph{%s}" . "\\paragraph*{%s}")
-                 ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
-
-  ;; Mimosis is a class I used to write my Ph.D. thesis.
-  (add-to-list 'org-latex-classes
-               '("mimosis"
-                 "\\documentclass{mimosis}
- [NO-DEFAULT-PACKAGES]
- [PACKAGES]
- [EXTRA]
-\\newcommand{\\mboxparagraph}[1]{\\paragraph{#1}\\mbox{}\\\\}
-\\newcommand{\\mboxsubparagraph}[1]{\\subparagraph{#1}\\mbox{}\\\\}"
-                 ("\\chapter{%s}" . "\\chapter*{%s}")
-                 ("\\section{%s}" . "\\section*{%s}")
-                 ("\\subsection{%s}" . "\\subsection*{%s}")
-                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
-                 ("\\mboxparagraph{%s}" . "\\mboxparagraph*{%s}")
-                 ("\\mboxsubparagraph{%s}" . "\\mboxsubparagraph*{%s}")))
-
-  ;; Elsarticle is Elsevier class for publications.
-  (add-to-list 'org-latex-classes
-               '("elsarticle"
-                 "\\documentclass{elsarticle}
- [NO-DEFAULT-PACKAGES]
- [PACKAGES]
- [EXTRA]"
-                 ("\\section{%s}" . "\\section*{%s}")
-                 ("\\subsection{%s}" . "\\subsection*{%s}")
-                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
-                 ("\\paragraph{%s}" . "\\paragraph*{%s}")
-                 ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
-
-
-  ;; (load "~/.emacs.d/.local/straight/repos/org-mode/lisp/ox-extra.el" t t)
-  (require 'ox-extra)
-  (ox-extras-activate '(ignore-headlines))
-  :custom
-  (org-support-shift-select 'always)
-  (org-babel-load-languages '((emacs-lisp . t)
-			      (python . t)
-			      (R . t)
-			      (latex . t)))
-
-  ;;local keybinding
-
-  :bind
-  (:map org-mode-map
-	("s-<up>" . org-previous-visible-heading)
-	("s-<down>" . org-next-visible-heading)
-	("C-c a" . org-agenda)
-	("C-c <deletechar>" . org-deadline)
-	("C-c c" . org-capture)
-	("C-c C-r" . org-archive-subtree)
-	("C-c t" . counsel-org-tag)
-	("C-c l" . counsel-org-link)
-	("C-x j" . org-cdlatex-mode)
-	("C-c k" . org-mark-ring-goto))
-
-
-
-
-  :hook
-  (org-mode . (lambda ()
-		(variable-pitch-mode 1)
-		(visual-line-mode 1)
-		(display-line-numbers-mode -1)
-		(org-toggle-pretty-entities)
-		(flycheck-mode 1)
-		(smartparens-mode 1)
-		;; (company-mode 1)
-		;; (org-cdlatex-mode 1)
-		)))
-
-(add-hook 'org-log-buffer-setup-hook
-	  (lambda()
-	    (setq ispell-local-dictionary "en_US")))
-(add-hook 'org-mode-hook
-	  (lambda ()
-            (LaTeX-add-environments "equation")
-	    (LaTeX-add-environments "equation*")
-	    (LaTeX-add-environments "lemma")
-	    (LaTeX-add-environments "theorem")
-	    (LaTeX-add-environments "example")
-	    (LaTeX-add-environments "Remark")
-	    (LaTeX-add-environments "proposition")))
-(add-hook 'org-beamer-mode-hook
-	  (lambda()
-	    (add-to-list 'org-beamer-environments-extra
-			 '("onlyenv" "O" "\\begin{onlyenv}%a" "\\end{onlyenv}"))
-	    (add-to-list 'org-beamer-environments-extra '("only" "o" "\\only%a{" "}"))
-	    (add-to-list 'org-beamer-environments-extra '("action" "A" "\\action%a{" "}"))
-	    ;; export snippet translations
-	    (add-to-list 'org-export-snippet-translation-alist
-			 '("b" . "beamer"))))
-
-;; Numbering
-(defun org-export-get-headline-number (headline info)
-    "Return numbered HEADLINE numbering as a list of numbers.
-    INFO is a plist holding contextual information."
-    (and (org-export-numbered-headline-p headline info)
-         (let* (
-                (nums (cdr (assq headline (plist-get info :headline-numbering))))
-                (root-heading (let ((parent headline)(temp)) (while (and (setq temp (org-element-property :parent parent)) (eq 'headline (org-element-type temp))) (setq parent temp)) parent))
-                (appendix (member "appendix" (org-element-property :tags root-heading))))
-           (if (eq 1 (length nums))
-               ;; if it's a part get roman numbers
-               (list (nth (car nums) '("Z" "I" "II" "III" "IV" "V" "VI" "VII" "VIII" "IX" "X")))
-               (let ((nums (cdr nums))) ; remove part number
-		 (cons (if appendix
-			   (concat "A." (substring (number-to-string nums) 1 -1))
-                         )
-                       (cdr nums))
-		 )))))
-(defun number-to-string (number)
-  (format "%s" number))
-
-;; Break inheritance of UNNUMBERED
-(defun org-export-numbered-headline-p (headline info)
-  "Return a non-nil value if HEADLINE element should be numbered.
-INFO is a plist used as a communication channel."
-  (unless (org-not-nil (org-export-get-node-property :UNNUMBERED headline  ))
-                                                      ; removing `t` here ↑
-                                                      ; removes inheritance
-    (let ((sec-num (plist-get info :section-numbers))
-      (level (org-export-get-relative-level headline info)))
-      (if (wholenump sec-num) (<= level sec-num) sec-num))))
-
-
-
-
-;; place CAPTION and LABEL in the right order
-(defun org-latex--caption/label-string (element info)
-  "Return caption and label LaTeX string for ELEMENT.
-
-  INFO is a plist holding contextual information.  If there's no
-  caption nor label, return the empty string.
-
-  For non-floats, see `org-latex--wrap-label'."
-  (let* ((label (org-latex--label element info nil t))
-     (main (org-export-get-caption element))
-     (attr (org-export-read-attribute :attr_latex element))
-     (type (org-element-type element))
-     (nonfloat (or (and (plist-member attr :float)
-                (not (plist-get attr :float))
-                main)
-               (and (eq type 'src-block)
-                (not (plist-get attr :float))
-                (null (plist-get info :latex-listings)))))
-     (short (org-export-get-caption element t))
-     (caption-from-attr-latex (plist-get attr :caption)))
-    (cond
-     ((org-string-nw-p caption-from-attr-latex)
-      (concat caption-from-attr-latex "\n"))
-     ((and (not main) (equal label "")) "")
-     ((not main) label)
-     ;; Option caption format with short name.
-     (t
-      (format (if nonfloat "\\captionof{%s}%s{%s}\n%s"
-        "\\caption%s%s{%s}\n%s")
-          (let ((type* (if (eq type 'latex-environment)
-                   (org-latex--environment-type element)
-                 type)))
-        (if nonfloat
-            (cl-case type*
-              (paragraph "figure")
-              (image "figure")
-              (special-block "figure")
-              (src-block (if (plist-get info :latex-listings)
-                     "listing"
-                   "figure"))
-              (t (symbol-name type*)))
-          ""))
-          (if short (format "[%s]" (org-export-data short info)) "")
-          (org-export-data main info)
-          label)))))
 
 ;; (with-eval-after-load 'ox-latex
 ;;   ;; cleanup org-mode export intermediary files
@@ -2187,14 +2437,130 @@ INFO is a plist used as a communication channel."
 ;;   (add-to-list 'org-latex-logfiles-extensions "bib")
 ;;   )
 
+
+(defun copy-figures-from-subsubdirs ()
+  "Copy .svg and .pdf_tex files from subsubdirectories named 'figures' into a local './figures' directory next to the current buffer's file. Prompts before overwriting."
+  (interactive)
+  (let* ((buffer-file (buffer-file-name)))
+    (unless buffer-file
+      (user-error "This buffer is not visiting a file."))
+    (let* ((base-dir (file-name-directory buffer-file))
+           (target-dir (expand-file-name "figures" base-dir))
+	   (found-figures-dirs '())
+           (found-files '())
+           (copied-files '())
+	   (overwrite-all nil))
+      ;; Ensure target directory exists
+      (unless (file-directory-p target-dir)
+        (make-directory target-dir t))
+
+      ;; Find all directories ending in '/figures' at least two levels deep
+      (dolist (dir1 (directory-files base-dir t "^[^.]"))
+        (when (file-directory-p dir1)
+          (dolist (dir2 (directory-files dir1 t "^[^.]"))
+            (when (and (file-directory-p dir2)
+                       (string= (file-name-nondirectory dir2) "figures"))
+              (message "Found figures directory: %s" dir2)
+              (push dir2 found-figures-dirs)))))
+      ;; Step 2: Match with regex
+      (dolist (fig-dir found-figures-dirs)
+        (dolist (f (directory-files-recursively fig-dir ".*\\(\\.svg\\|\\.pdf_tex\\|\\.pdf\\)$" t)))
+        (setq found-files (append found-files
+                                  (directory-files-recursively fig-dir ".*\\(\\.svg\\|\\.pdf_tex\\|\\.pdf\\)$" t))))
+
+      ;; Print found files for debugging
+      (if found-files
+          (progn
+            (message "Found %d file(s):" (length found-files))
+            (dolist (f found-files)
+              (message "Found: %s" f)))
+        (message "No matching files found in any subsubdirectory named 'figures'."))
+
+      ;; Copy files with prompt
+      ;; (dolist (file found-files)
+      ;;   (let ((target-path (expand-file-name (file-name-nondirectory file) target-dir)))
+      ;;     (if (file-exists-p target-path)
+      ;;         (when (yes-or-no-p (format "File %s exists. Overwrite?" (file-name-nondirectory file)))
+      ;;           (copy-file file target-path t)
+      ;;           (push (cons file target-path) copied-files))
+      ;;       (copy-file file target-path)
+      ;;       (push (cons file target-path) copied-files))))
+
+      ;; Step 4: Copy with default "Yes" overwrite
+      ;; (dolist (file found-files)
+      ;;   (let ((target-path (expand-file-name (file-name-nondirectory file) target-dir)))
+      ;;     (if (file-exists-p target-path)
+      ;;         (if (y-or-n-p (format "File %s exists. Overwrite? " (file-name-nondirectory file)))
+      ;;             (copy-file file target-path t))
+      ;;       (copy-file file target-path))
+      ;;     (push (cons file target-path) copied-files))
+
+      ;; Step 4: Ask once if the user wants to overwrite all
+      (setq overwrite-all (yes-or-no-p "Do you want to overwrite all existing files in the target directory?"))
+
+	(dolist (file found-files)
+           (let ((target-path (expand-file-name (file-name-nondirectory file) target-dir)))
+	     (if (file-exists-p target-path)
+	      (if overwrite-all
+		  (progn
+		    (copy-file file target-path t) ;; Overwrite all without prompting
+		    (message "Automatically overwrote: %s" file))
+		(if (y-or-n-p (format "File %s exists. Overwrite? " (file-name-nondirectory file)))
+		    (progn
+		      (copy-file file target-path t)
+		      (message "Overwritten: %s" file))
+		  (message "Skipped: %s" file)))
+	    (copy-file file target-path)) ;; If file doesn't exist, just copy
+	  (push (cons file target-path) copied-files))
+
+
+      ;; Report copied files
+      (if copied-files
+          (progn
+            (message "Copied %d file(s) to %s:" (length copied-files) target-dir)
+            (dolist (pair copied-files)
+              (message "Copied: %s -> %s" (car pair) (cdr pair))))
+        (message "No files copied."))))))
+;; ========================
+;;       thesis hydra    ;;
+;; ========================
+;; thesis hydra.
+(defhydra thesis-menu-transient-state (:color pink
+				       :hint nil)
+  "
+                 P.h.D Thesis Menu
+^Main Files^       ^Chapters^       ^Actions^
+^^^^^^^^-------------------------------------------
+_m_: Thesis        _1_: Research 1  _o_: Open Thesis.pdf externally
+_t_: Title page    _2_: Research 2  _c_: Async compile file
+_i_: Introduction  _3_: Research 3  _q_: Cancel
+_s_: thesis.setup  ^ ^              _u_: Update figures
+_d_: Summary       ^ ^              ^ ^
+"
+      ("q" nil :exit t)
+      ("m" (find-file "~/Documents/monash/writing/org_thesis/thesis/thesis.org") :exit t)
+      ("t" (find-file "~/Documents/monash/writing/org_thesis/thesis/title.org") :exit t)
+      ("s" (find-file "~/Documents/monash/writing/org_thesis/setup/thesis.setup") :exit t)
+      ("i" (find-file "~/Documents/monash/writing/org_thesis/thesis/introduction/introduction.org") :exit t)
+      ("d" (find-file "~/Documents/monash/writing/org_thesis/thesis/summary/summary.org") :exit t)
+      ("1" (find-file "~/Documents/monash/writing/org_thesis/thesis/ch1/research.org") :exit t)
+      ("2" (find-file "~/Documents/monash/writing/org_thesis/thesis/ch2/research.org") :exit t)
+      ("3" (find-file "~/Documents/monash/writing/org_thesis/thesis/ch3/research.org") :exit t)
+      ("u" (copy-figures-from-subsubdirs) :exit t)
+      ("o" (shell-command "open ~/Documents/monash/writing/org_thesis/thesis/thesis.pdf" :exit t))
+      ("c" (org-latex-export-to-pdf :async t) :exit t))
+
+(global-set-key (kbd "s-t") 'thesis-menu-transient-state/body)
+
+
 ;; ========================
 ;;       cover letter    ;;
 ;; ========================
 ;; https://orgmode.org/manual/LaTeX-specific-export-settings.html
 (add-to-list 'org-latex-packages-alist
              '("AUTO" "babel" t ("pdflatex")))
-(add-to-list 'org-latex-packages-alist
-             '("AUTO" "polyglossia" t ("xelatex" "lualatex")))
+;; (add-to-list 'org-latex-packages-alist
+;;              '("AUTO" "polyglossia" t ("xelatex" "lualatex")))
 (eval-after-load 'ox '(require 'ox-koma-letter))
  ;; KOMA-SCript letter
 (eval-after-load 'ox-koma-letter
@@ -2206,6 +2572,8 @@ INFO is a plist used as a communication channel."
 [NO-DEFAULT-PACKAGES]"))
 
        (setq org-koma-letter-default-class "my-koma-letter")))
+
+;; (setq org-koma-letter-closing "Yours sincerely,")
 
 
 ;; stop org from prettifying sub and superscripts
@@ -2219,40 +2587,23 @@ INFO is a plist used as a communication channel."
 		       (make-local-variable 'org-pretty-entities-include-sub-superscripts)
 		       (setq org-pretty-entities-include-sub-superscripts nil))))
 
-;; ========================
-;;       org-reveal      ;;
-;; ========================
-(use-package org-re-reveal
-  ;; :disabled
-  :straight t
-  :after org
-  :commands (org-re-reveal-export-to-html
-             org-re-reveal-export-to-html-and-browse)
-  :config
-  (setq org-re-reveal-subtree-with-title-slide t
-	org-re-reveal-ref-bib "bibliography"
-	org-reveal-title-slide nil
-	org-re-reveal-slide-number "c/t"
-	org-re-reveal-history t
-	org-re-reveal-transition "convex"
-	org-re-reveal-external-plugins '((myZoom . "{src: 'https://rs-math.net/beamerkiller/reveal.js/plugin/zoom/zoom.js'}")
-					 (myHighlight . "{src: 'https://rs-math.net/beamerkiller/reveal.js/plugin/highlight/highlight.js'}")
-					 (myNotes . "{src: 'plugin/notes/notes.js', async: true}")
-					 (myChalk . "{src: 'https://rs-math.net/beamerkiller/reveal.js/plugin/chalkboard/chalkboard.js'}")))
-  (add-to-list 'org-structure-template-alist '("R" . "#+REVEAL_HTML: ?\n"))
-  (use-package org-re-reveal-ref
-    :after org-re-reveal
-    :init (setq org-ref-default-bibliography '("~/Documents/monash/writing/ref/references.bib"))
-    )
-  )
+;; ==============================================================================
+;;            export example blocks to example environment in latex            ;;
+;; ==============================================================================
 
+(defun my-latex-export-example-blocks (text backend info)
+  "Export example blocks as listings env."
+  (when (org-export-derived-backend-p backend 'latex)
+    (with-temp-buffer
+      (insert text)
+      ;; replace verbatim env by listings
+      (goto-char (point-min))
+      (replace-string "\\begin{verbatim}" "\\begin{Example}")
+      (replace-string "\\end{verbatim}" "\\end{Example}")
+      (buffer-substring-no-properties (point-min) (point-max)))))
 
-
-;; (use-package ox-reveal
-;;   :straight t
-;;   :init
-;;   (setq org-reveal-hlevel 2))
-
+(add-to-list 'org-export-filter-example-block-functions
+         'my-latex-export-example-blocks)
 
 ;; ========================
 ;;       org-pomodoro    ;;
@@ -2529,6 +2880,21 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
   (add-hook 'xenops-mode-hook 'xenops-render)
   )
 
+(setq xdvsvgm
+        '(xdvsvgm
+          :programs ("latex" "dvisvgm")
+          :description "dvi > svg"
+          :message "you need to install the programs: latex and dvisvgm."
+          :use-xcolor t
+          :image-input-type "dvi"
+          :image-output-type "svg"
+          :image-size-adjust (1.7 . 1.5)
+          :latex-compiler ("latex -no-pdf -interaction nonstopmode -output-directory %o %f")
+          :image-converter ("dvisvgm %f -n -b %B -c %S -o %O --libgs=/opt/homebrew/Cellar/ghostscript/10.02.1/lib/libgs.10.dylib")))
+(with-eval-after-load 'xenops
+  (add-to-list 'xenops-math-latex-process-alist xdvsvgm)
+  (setq xenops-math-latex-process 'xdvsvgm))
+
 
 ;; ============================
 ;;       org2latex           ;;
@@ -2561,7 +2927,7 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
    other buffer already has the PDF open"
   (interactive)
   (save-buffer)
-  (shell-command (concat "pdflatex " (buffer-file-name)))
+  (shell-command (concat "lualatex -shell-escape -interaction nonstopmode -output-directory %o" (buffer-file-name)))
   (switch-to-buffer (other-buffer))
   (kill-buffer)
   ;; (update-other-buffer)
@@ -2601,7 +2967,9 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
 (defun inkscape-watch ()
   "watch for figures"
   (interactive)
-  (shell-command "inkscape-figures watch"))
+  (shell-command "inkscape-figures watch")
+  ;; (shell-command (concat "cd " (file-name-directory (buffer-file-name)) "figures/" "&& inkscape-figures-manager start"))
+  )
 
 (defun inkscape-create ()
   (interactive)
@@ -2616,10 +2984,15 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
   (interactive)
   (shell-command (concat "inkscape-figures edit " (file-name-directory (buffer-file-name)) "figures/")))
 
+(defun inkscape-quit ()
+  "kill the inkscape figures manager"
+  (interactive)
+  (shell-command "pkill inkscape-figures-manager start"))
+
 (define-key org-mode-map (kbd "C-c h w") 'inkscape-watch);
 (define-key org-mode-map (kbd "C-c h c") 'inkscape-create);
 (define-key org-mode-map (kbd "C-c h e") 'inkscape-edit);
-
+(define-key org-mode-map (kbd "C-c h s") 'inkscape-quit);
 
 (setq org-link-file-path-type 'noabbrev)
 (delete '("\\.pdf\\'" . default) org-file-apps)
@@ -2652,7 +3025,10 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
   (pdf-tools-install)
   (setq-default pdf-view-display-size 'fit-width)
   :custom
-  (pdf-annot-activate-created-annotations t "automatically annotate highlights"))
+  (pdf-annot-activate-created-annotations t "automatically annotate highlights")
+  :hook
+  (pdf-view-mode . (lambda ()
+		     (display-line-numbers-mode -1))))
 
 
 ;; (use-package org-noter
@@ -2711,16 +3087,19 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
 
 
 ;;use org-superstar-mode to replace org-bullets
-(use-package org-superstar
-  :after org
-  :config
-  (setq org-superstar-special-todo-items t)
-  :hook
-  (org-mode . org-superstar-mode)
-  :custom
-  ;; (org-ellipsis " ⚡")
-  (org-ellipsis " ▿")
-  )
+;; (use-package org-superstar
+;;   :ensure t
+;;   :after org
+;;   :config
+;;   (setq org-superstar-leading-bullet " ")
+;;   (setq org-superstar-special-todo-items t)
+;;   (add-hook 'org-mode-hook (lambda () (org-superstar-mode 1)))
+;;   (setq org-superstar-headline-bullets-list
+;;         '("◉" ?* "○" "" "✿" "✸"))
+;;   :custom
+;;   ;; (org-ellipsis " ⚡")
+;;   (org-ellipsis " ▿")
+;;   )
 
 ;;prettify-symbols-mode setting
 ;; (add-hook 'org-mode-hook 'prettify-symbols-mode)
@@ -2787,7 +3166,7 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
 	`(
 	  ;; Org tags
 	  (":\\([A-Za-z0-9]+\\)" . ((lambda (tag) (svg-tag-make tag))))
-	  (":\\([A-Za-z0-9]+_+[A-Za-z0-9]+\\)" . ((lambda (tag) (svg-tag-make tag))))
+	  (":\\([A-Za-z0-9_]+\\)" . ((lambda (tag) (svg-tag-make tag))))
 
 	  ;; Task priority
 	  ("\\[#[A-Z]\\]" . ((lambda (tag)
@@ -2816,6 +3195,15 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
 								   :end -1
 								   :crop-left t))))
 
+	  ;; org-ref citation
+	  ("\\(\\[\\[cite:&[A-Za-z0-9_]+\\)" . ((lambda (tag)
+					    (svg-tag-make tag
+							  :inverse t
+							  :beg 8))))
+	  ("\\(;&[A-Za-z0-9_]+\\)" . ((lambda (tag)
+					    (svg-tag-make tag
+							  :inverse t
+							  :beg 2))))
 
 	  ;; Active date (with or without day name, with or without time)
 	  (,(format "\\(<%s>\\)" date-re) .
@@ -2931,8 +3319,7 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
                                      (no-delete-other-windows . t)))))
 
 
-(straight-use-package '(simple-httpd :type git :host github :repo "ruiying-ocean/simple-httpd" :local-repo "simple-httpd"))
-
+(use-package simple-httpd)
 ;; a mindmap-like visualiser for org-roam
 (use-package org-roam-ui
   :defer t
@@ -3009,7 +3396,7 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
   (setq TeX-parse-self t)
   (setq Tex-file-line-error t)
   (setq-default TeX-master nil)
-  (setq-default TeX-engine XeTex) ;;default engine
+  (setq-default TeX-engine 'luatex) ;;default engine
 
   (add-hook 'LaTeX-mode-hook
             (lambda ()
@@ -3032,12 +3419,6 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
 	 (LaTeX-mode . yas-minor-mode)
          (post-self-insert . my/yas-try-expanding-auto-snippets))
   :config
-  (use-package warnings
-    :config
-    (cl-pushnew '(yasnippet backquote-change)
-                warning-suppress-types
-                :test 'equal))
-
   (setq yas-triggers-in-field t)
 
   ;; Function that tries to autoexpand YaSnippets
@@ -3046,6 +3427,11 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
     (when (and (boundp 'yas-minor-mode) yas-minor-mode)
       (let ((yas-buffer-local-condition ''(require-snippet-condition . auto)))
         (yas-expand)))))
+
+(require 'warnings)
+
+(with-eval-after-load 'yasnippet
+  (add-to-list 'warning-suppress-types '(yasnippet backquote-change)))
 
 ;; CDLatex integration with YaSnippet: Allow cdlatex tab to work inside Yas
 ;; fields
@@ -3061,14 +3447,16 @@ C-S-mouse-1:\t open link in new frame / open mu4e mail
 				    (?s "\\mathscr" nil t nil nil)
 				    (?l "\\textsl" nil t nil nil)
 				    (?t "\\text" nil t nil nil)))
-  (setq cdlatex-math-symbol-alist '((?. ("\\cdot" "\\circ"))
+  (setq cdlatex-math-symbol-alist '((?. ("\\cdot" "\\circ" "\\odot"))
 				    (?i ("\\in" "\\not\\in" "\\imath"))
 				    (?B ("\\iota"))
 				    (?j (nil nil "\\jmath"))
 				    (?F ("\\Phi"))
+				    (?\; ("\\;"))
+				    (?& (nil))
 				    (?9 ("\\cap" "\\bigcap"))
 				    (?+ ("\\cup" "\\bigcup"))
-				    (?V ("\\Vee"))
+				    (?V ("\\bigvee"))
 				    (?W ("\\Xi" "\\Wedge"))
 				    (?w ("\\xi" "\\wedge"))))
 
