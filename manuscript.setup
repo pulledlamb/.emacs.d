@@ -1,0 +1,192 @@
+# -*- mode: org; -*-
+#+STARTUP: content
+
+* COMMENT Paper Setup
+
+The paper setup controls the export of content for publication. Using a dedicated paper setup makes it simpler to include the content later in a thesis, simply by swapping or ignoring the setup of the individual file and using and overarching =thesis.setup=.
+Additionally, for publication we can remove any setup at all to get a clean export using whatever class provided by the publisher. If NeuroImage is the target, for example, then we should use the elsarticle class. Support for multiple classes for publication, within Emacs Org-Mode, can be found [[https://github.com/jkitchin/scimax/blob/master/ox-manuscript/ox-manuscript.el][in the scimax starters package]].
+To make the main file inclusion simpler, only use the first 5 lines of the paper file for extra configuration. All the rest should go in the setup file.
+
+Remember that #+OPTIONS are parsed even from =:noexport:= headings.
+
+* Options :noexport:
+
+The options are intended to remove default clutter that Org adds automatically to the export.
+#+OPTIONS:  date:nil ^:{} toc:nil d:t author:nil tags:nil H:5
+
+* LaTeX headers :noexport:
+
+
+#+LATEX_HEADER: \let\proof\relax
+#+LATEX_CLASS_OPTIONS: [dvipsnames]
+
+
+#+LATEX_HEADER: \usepackage{amssymb}
+#+LATEX_HEADER: \usepackage{amsmath}
+#+LATEX_HEADER: \usepackage{upgreek}
+#+LATEX_HEADER: \usepackage{amsfonts}
+#+LATEX_HEADER: \usepackage{graphicx}
+#+LATEX_HEADER: \usepackage{epstopdf}
+#+LATEX_HEADER: \usepackage[]{enumerate}
+#+LATEX_HEADER: \usepackage{algorithm}
+#+LATEX_HEADER: \usepackage{algpseudocode}
+#+LATEX_HEADER: \usepackage{amsthm}
+#+LATEX_HEADER: \usepackage{mathrsfs}
+# #+LATEX_HEADER: \usepackage[linktocpage, pdfstartview=FitH, colorlinks, linkcolor=black, anchorcolor=black, citecolor=black, filecolor=black, menucolor=black, urlcolor=black]{hyperref}
+#+LATEX_HEADER: \usepackage{csquotes}
+#+LATEX_HEADER: \usepackage{cleveref}
+#+LATEX_HEADER: \usepackage{bbm}
+#+LATEX_HEADER: \usepackage{xcolor}
+#+LATEX_HEADER: \usepackage{tikz}
+#+LATEX_HEADER: \usepackage{subcaption}
+#+LATEX_HEADER: \usepackage{wasysym}
+#+LATEX_HEADER: \usetikzlibrary{decorations.text, fit}
+#+LATEX_HEADER: \usepackage{aligned-overset}
+
+
+# cleveref and enumi
+#+LATEX_HEADER: \crefname{prop}{property}{properties}
+#+LATEX_HEADER: \crefname{Assumption}{assumption}{assumptions}
+#+LATEX_HEADER: \crefalias{subassumption}{Assumption}
+#+LATEX_HEADER: \crefalias{enumi}{prop}
+#+LATEX_HEADER: \crefname{equation}{}{}
+
+
+
+#+LATEX_HEADER: \usepackage[shortlabels]{enumitem}
+#+LATEX_HEADER: \setlist[enumerate]{leftmargin=.5in}
+#+LATEX_HEADER: \setlist[itemize]{leftmargin=.5in}
+
+#+LATEX_HEADER: \addtolength{\hoffset}{-0.8cm} \addtolength{\textwidth}{1.6cm}
+#+LATEX_HEADER: \addtolength{\textheight}{1.1cm}
+
+#+LATEX_HEADER: \interfootnotelinepenalty=10000
+
+#+LATEX_HEADER: \newcommand{\creflastconjunction}{, and~}
+
+
+# Theorems and alike
+#+LATEX_HEADER: \newtheorem{Theorem}{Theorem}[section]
+#+LATEX_HEADER: \newtheorem{Lemma}[Theorem]{Lemma}
+#+LATEX_HEADER: \newtheorem{Proposition}[Theorem]{Proposition}
+#+LATEX_HEADER: \newtheorem{Corollary}[Theorem]{Corollary}
+#+LATEX_HEADER: \newtheorem{Definition}[Theorem]{Definition}
+#+LATEX_HEADER: \newtheorem{Example}[Theorem]{Example}
+#+LATEX_HEADER: \newtheorem{Remark}[Theorem]{Remark}
+#+LATEX_HEADER: \newtheorem{Notation}[Theorem]{Notation}
+#+LATEX_HEADER: \newtheorem{Hypothesis}[Theorem]{Hypothesis}
+#+LATEX_HEADER: \newtheorem{Assumption}[subsection]{Assumption}
+#+LATEX_HEADER: \numberwithin{equation}{section}
+#+LATEX_HEADER: \DeclareMathOperator*{\supess}{ess\,sup}
+
+
+# set counter and label for subassumptions
+#+LATEX_HEADER: \newcounter{subassumption}[subsection]
+#+LATEX_HEADER: \renewcommand{\thesubassumption}{(\textit{\roman{subassumption}})}
+
+#+LATEX_HEADER: \makeatletter
+#+LATEX_HEADER: \newcommand{\leqnomode}{\tagsleft@true\let\veqno\@@leqno}
+#+LATEX_HEADER: \newcommand{\reqnomode}{\tagsleft@false\let\veqno\@@eqno}
+#+LATEX_HEADER: \renewcommand{\p@subassumption}{\theAssumption}% Counter prefix.
+#+LATEX_HEADER: \makeatother
+
+#+LATEX_HEADER: \newcommand{\subasu}{% Just like \item in a list, but for an asu
+#+LATEX_HEADER:   \refstepcounter{subassumption}%
+#+LATEX_HEADER:   \thesubassumption~\ignorespaces}
+
+
+
+# claim environment
+#+LATEX_HEADER: \newenvironment{claim}[1]{\par\noindent Claim:\space#1}{}
+
+
+# comment this line if using lualatex instead of pdflatex
+# #+LATEX_HEADER: \DeclareUnicodeCharacter{200B}{}
+
+#+LATEX_HEADER: \usepackage{booktabs}
+#+LATEX_HEADER: \renewcommand{\arraystretch}{1.1}
+#+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \newcommand{\email}[1]{\protect\href{mailto:#1}{#1}}
+#+LATEX_HEADER: \newcommand\funding[1]{\protect {\color{black}\bfseries Funding:} #1}
+#+LATEX_HEADER: \providecommand{\keyword}[1]{\textbf{\textit{Keywords---}} #1}
+
+
+Using /biblatex/ here; to use a cumstom /.bst/ file, use /natbib/ instead:
+# #+LaTeX_HEADER: \usepackage[numbers]{natbib}
+# #+LaTeX_HEADER: \bibliographystyle{abbrvnat}
+
+#+LATEX_HEADER: \usepackage[autocite=plain, backend=bibtex, doi=true, url=true, hyperref=true, maxcitenames=2, giveninits=true]{biblatex}
+#+LATEX_HEADER: \renewbibmacro{in:}{%
+#+LATEX_HEADER: \ifentrytype{article}
+#+LATEX_HEADER: {}
+#+LATEX_HEADER: {\bibstring{in}%
+#+LATEX_HEADER: \printunit{\intitlepunct}}}
+#+LATEX_HEADER: \AtEveryBibitem{%
+#+LATEX_HEADER:  \clearfield{issn} % Remove issn
+#+LATEX_HEADER:  \clearfield{doi} % Remove doi
+#+LATEX_HEADER: \ifentrytype{online}{}{% Remove url except for @online
+#+LATEX_HEADER:   \clearfield{url}
+#+LATEX_HEADER: }
+#+LATEX_HEADER: }
+#+LATEX_HEADER: \DeclareFieldFormat*{title}{#1}
+#+LATEX_HEADER: \DeclareFieldFormat{journaltitle}{#1\isdot}
+#+LATEX_HEADER: \DeclareFieldFormat*{title}{\mkbibitalic{#1}}
+#+LATEX_HEADER: \usepackage[binary-units=true]{siunitx}
+#+LATEX_HEADER: \DeclareSIUnit\px{px}
+#+LATEX_HEADER: \usepackage{textcomp}% for '\textdegree' macro
+# #+LATEX_HEADER: \AfterPreamble{\hypersetup{
+# #+LATEX_HEADER: linktocpage,
+# #+LATEX_HEADER: linkcolor=black,
+# #+LATEX_HEADER: anchorcolor=black,
+# #+LATEX_HEADER: citecolor=black,
+# #+LATEX_HEADER: filecolor=black,
+# #+LATEX_HEADER: menucolor=black,
+# #+LATEX_HEADER: urlcolor=black
+# #+LATEX_HEADER: }}
+
+
+# inkscape setup
+#+LATEX_HEADER: \usepackage{import}
+#+LATEX_HEADER: \usepackage{xifthen}
+#+LATEX_HEADER: \usepackage{pdfpages}
+#+LATEX_HEADER: \usepackage{transparent}
+
+#+LATEX_HEADER: \newcommand{\incfig}[1]{%
+#+LATEX_HEADER:     \def\svgwidth{\columnwidth}
+#+LATEX_HEADER:     \import{./figures/}{#1.pdf_tex}
+#+LATEX_HEADER: }
+
+# argmin and argmax
+#+LATEX_HEADER: \DeclareMathOperator*{\argmax}{argmax}
+#+LATEX_HEADER: \DeclareMathOperator*{\argmin}{argmin}
+
+
+# signature
+#+LATEX_HEADER: \newbox\namebox
+#+LATEX_HEADER: \newdimen\signboxdim
+
+#+LATEX_HEADER: \def\signature#1{%
+#+LATEX_HEADER:     \setbox\namebox=\hbox{#1}
+#+LATEX_HEADER:     \signboxdim=\dimexpr(\wd\namebox+1cm)
+#+LATEX_HEADER:     \parbox[t]{\signboxdim}{%
+#+LATEX_HEADER:         \centering
+#+LATEX_HEADER: %           \mbox{}\leaders\hbox to .4em{\hss.\hss}\hskip\nameboxdim\mbox{}\\   % for dots
+#+LATEX_HEADER:             \hrulefill\\    % for a line
+#+LATEX_HEADER:             #1
+#+LATEX_HEADER:         \par}%
+#+LATEX_HEADER:     }
+
+
+# horizontal cancel in math mode
+#+LATEX_HEADER: \newcommand\hcancel[2][black]{\setbox0=\hbox{$#2$}%
+#+LATEX_HEADER: \rlap{\raisebox{.45\ht0}{\textcolor{#1}{\rule{\wd0}{1pt}}}}#2}
+
+* HTML headers :noexport:
+
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="http://www.pirilampo.org/styles/readtheorg/css/htmlize.css"/>
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="http://www.pirilampo.org/styles/readtheorg/css/readtheorg.css"/>
+
+#+HTML_HEAD: <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+#+HTML_HEAD: <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+#+HTML_HEAD: <script type="text/javascript" src="http://www.pirilampo.org/styles/lib/js/jquery.stickytableheaders.min.js"></script>
+#+HTML_HEAD: <script type="text/javascript" src="http://www.pirilampo.org/styles/readtheorg/js/readtheorg.js"></script>
